@@ -1,0 +1,36 @@
+{
+  "name": "people-context-plugins",
+  "owner": {
+    "name": "Jinyang Wang"
+  },
+  "description": "Local-first Claude Code integrations for people-context-mcp.",
+  "plugins": [
+    {
+      "name": "people-context",
+      "displayName": "People Context",
+      "version": "0.1.0",
+      "source": ".",
+      "description": "Give Claude Code local, durable context about the people in your life through an automatically managed stdio MCP server.",
+      "author": {
+        "name": "Jinyang Wang"
+      },
+      "homepage": "https://github.com/JinyangWang27/people-context-mcp/blob/main/docs/claude-code-plugin.md",
+      "repository": "https://github.com/JinyangWang27/people-context-mcp",
+      "license": "MIT",
+      "keywords": [
+        "mcp",
+        "people",
+        "context",
+        "memory",
+        "local-first"
+      ],
+      "category": "productivity",
+      "tags": [
+        "mcp",
+        "personal-knowledge",
+        "local-first"
+      ],
+      "strict": true
+    }
+  ]
+}
