@@ -64,5 +64,7 @@ class RecordObservation:
             entity_id=observation.id,
             payload=snapshot(observation),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return observation

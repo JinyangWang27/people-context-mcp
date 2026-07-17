@@ -42,6 +42,15 @@ class SetCommunicationPhilosophy:
             entity_type="preference",
             entity_id=PREF_COMMUNICATION_PHILOSOPHY,
             payload={"before_length": len(previous) if previous is not None else None, "after_length": len(data.text)},
+            replay_payload={
+                "key": PREF_COMMUNICATION_PHILOSOPHY,
+                "value": data.text,
+                "updated_at": philosophy.updated_at.isoformat(),
+            },
+            changed_fields=["value", "updated_at"],
+            op_kind="prefs",
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return philosophy

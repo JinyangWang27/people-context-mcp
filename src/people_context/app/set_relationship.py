@@ -71,5 +71,7 @@ class SetRelationship:
             entity_id=relationship.id,
             payload=snapshot(relationship),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return relationship

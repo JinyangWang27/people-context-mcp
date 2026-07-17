@@ -98,7 +98,11 @@ class CorrectRecord:
             entity_type=data.entity_type,
             entity_id=data.entity_id,
             payload={"before": snapshot(current), "after": snapshot(updated), "fields": sorted(data.fields)},
+            replay_payload=snapshot(updated),
+            changed_fields=sorted(data.fields),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return updated
 

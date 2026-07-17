@@ -7,11 +7,12 @@ from pydantic import BaseModel
 from people_context.app.write_support import (
     PersonNotFoundError,
     RecordNotFoundError,
+    audit_mutation,
     require_active_person,
     transactional,
     unit_of_work_for,
 )
-from people_context.ports.audit_log import AuditEntry
+from people_context.ports.audit_log import AuditLog
 from people_context.ports.clock import Clock
 from people_context.ports.lifecycle import LifecycleStore, LifecycleTargetNotFoundError
 from people_context.ports.repository import PersonReader
@@ -39,11 +40,18 @@ class ForgetResult(BaseModel):
 class Forget:
     """Validate and execute irreversible person or record deletion."""
 
-    def __init__(self, people: PersonReader, lifecycle: LifecycleStore, clock: Clock) -> None:
+    def __init__(
+        self,
+        people: PersonReader,
+        lifecycle: LifecycleStore,
+        clock: Clock,
+        audit: AuditLog | None = None,
+    ) -> None:
         self._people = people
         self._lifecycle = lifecycle
         self._clock = clock
-        self._uow = unit_of_work_for(lifecycle)
+        self._audit = audit or lifecycle.audit_log
+        self._uow = unit_of_work_for(lifecycle, self._audit)
 
     @transactional
     def execute(self, target: str, scope: str) -> ForgetResult:
@@ -51,19 +59,17 @@ class Forget:
         if scope == "person":
             if self._people.get(target) is None:
                 raise PersonNotFoundError(target)
-            deleted = self._lifecycle.forget_person(target, self._audit_factory(scope, target))
+            deleted = self._lifecycle.forget_person(target)
+            self._record_audit(scope, target, deleted)
             return ForgetResult(scope=scope, target=target, deleted=deleted)
         if scope != "record":
             raise ForgetError("invalid_scope", "scope must be 'person' or 'record'", scope=scope)
         entity_type, entity_id = self._parse_record_target(target)
         try:
-            deleted = self._lifecycle.forget_record(
-                entity_type,
-                entity_id,
-                self._audit_factory(scope, target),
-            )
+            deleted = self._lifecycle.forget_record(entity_type, entity_id)
         except LifecycleTargetNotFoundError:
             raise RecordNotFoundError(entity_type, entity_id) from None
+        self._record_audit(scope, target, deleted)
         return ForgetResult(scope=scope, target=target, deleted=deleted)
 
     @staticmethod
@@ -77,20 +83,16 @@ class Forget:
             )
         return entity_type, entity_id
 
-    def _audit_factory(self, scope: str, target: str):
-        """Use the forget scope as entity type and the person id or concrete record target as entity id."""
-
-        def create(deleted: dict[str, int]) -> AuditEntry:
-            return AuditEntry(
-                ts=self._clock.now(),
-                op="forget",
-                entity_type=scope,
-                entity_id=target,
-                payload={"scope": scope, "deleted": deleted},
-                source="agent",
-            )
-
-        return create
+    def _record_audit(self, scope: str, target: str, deleted: dict[str, int]) -> None:
+        audit_mutation(
+            self._audit,
+            self._clock,
+            op="forget",
+            entity_type=scope,
+            entity_id=target,
+            payload={"scope": scope, "deleted": deleted},
+            source="agent",
+        )
 
 
 class ForgetPreview(BaseModel):

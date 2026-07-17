@@ -68,5 +68,7 @@ class RecordInteraction:
             entity_id=interaction.id,
             payload=snapshot(interaction),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return interaction

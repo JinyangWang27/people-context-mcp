@@ -71,5 +71,7 @@ class SetReminder:
             entity_id=reminder.id,
             payload=snapshot(reminder),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return reminder

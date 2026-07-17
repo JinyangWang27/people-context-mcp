@@ -6,40 +6,80 @@ import json
 import sqlite3
 from collections.abc import Callable
 
+from people_context.adapters.sqlite.audit_log import SqliteAuditLog
+from people_context.adapters.sqlite.record_store import SqliteRecordStore
+from people_context.adapters.sqlite.repository import SqlitePeopleRepository
 from people_context.adapters.sqlite.unit_of_work import SqliteUnitOfWork
 from people_context.domain.person import Person
 from people_context.domain.shared import normalize_name
-from people_context.ports.audit_log import AuditEntry
-from people_context.ports.lifecycle import LifecycleTargetNotFoundError
+from people_context.ports.lifecycle import LifecycleChange, LifecycleTargetNotFoundError, MergeStoreResult
+
+_LINKED_TABLES = {
+    "fact": "facts",
+    "observation": "observations",
+    "trait": "traits",
+    "reminder": "reminders",
+    "affiliation": "affiliations",
+}
 
 
 class SqliteLifecycleStore:
     """Execute merge/forget multi-table operations on one SQLite transaction."""
 
-    def __init__(self, conn: sqlite3.Connection, failure_hook: Callable[[str], None] | None = None) -> None:
+    def __init__(
+        self,
+        conn: sqlite3.Connection,
+        failure_hook: Callable[[str], None] | None = None,
+        *,
+        audit_failure_hook: Callable[[str], None] | None = None,
+        changelog_failure_hook: Callable[[str], None] | None = None,
+    ) -> None:
         self._conn = conn
         self._failure_hook = failure_hook
+        self._audit_failure_hook = audit_failure_hook
+        self._changelog_failure_hook = changelog_failure_hook
 
     @property
     def unit_of_work(self) -> SqliteUnitOfWork:
         """Return a join-safe transaction boundary for application orchestration."""
         return SqliteUnitOfWork(self._conn)
 
-    def merge_people(
-        self,
-        primary: Person,
-        duplicate_id: str,
-        audit_factory: Callable[[dict[str, int]], AuditEntry],
-    ) -> dict[str, int]:
-        """Re-parent duplicate-linked rows and append one audit atomically."""
+    @property
+    def audit_log(self) -> SqliteAuditLog:
+        """Expose the paired mutation journal for backward-compatible app construction."""
+        return SqliteAuditLog(
+            self._conn,
+            self._audit_failure_hook,
+            changelog_failure_hook=self._changelog_failure_hook,
+        )
+
+    def merge_people(self, primary: Person, duplicate_id: str) -> MergeStoreResult:
+        """Re-parent duplicate-linked rows and return exact row outcomes."""
         with SqliteUnitOfWork(self._conn):
+            people = SqlitePeopleRepository(self._conn)
+            records = SqliteRecordStore(self._conn)
+            primary_before = people.get(primary.id)
+            linked_ids = {
+                entity_type: self._ids_for_person(table, duplicate_id) for entity_type, table in _LINKED_TABLES.items()
+            }
+            relationship_rows = self._conn.execute(
+                "SELECT id, subject_id, object_id FROM relationships WHERE subject_id = ? OR object_id = ?",
+                (duplicate_id, duplicate_id),
+            ).fetchall()
+            participation_ids = [
+                row["interaction_id"]
+                for row in self._conn.execute(
+                    "SELECT interaction_id FROM interaction_participants WHERE person_id = ? ORDER BY interaction_id",
+                    (duplicate_id,),
+                ).fetchall()
+            ]
+
             self._save_primary(primary, duplicate_id)
             counts = {
-                "facts": self._reparent("facts", duplicate_id, primary.id),
-                "observations": self._reparent("observations", duplicate_id, primary.id),
-                "traits": self._reparent("traits", duplicate_id, primary.id),
-                "reminders": self._reparent("reminders", duplicate_id, primary.id),
-                "affiliations": self._reparent("affiliations", duplicate_id, primary.id),
+                f"{entity_type}s" if entity_type != "affiliation" else "affiliations": self._reparent(
+                    table, duplicate_id, primary.id
+                )
+                for entity_type, table in _LINKED_TABLES.items()
             }
             relationships, self_loops = self._merge_relationships(primary.id, duplicate_id)
             counts["relationships"] = relationships
@@ -50,16 +90,40 @@ class SqliteLifecycleStore:
                 (primary.updated_at.isoformat(), primary.updated_at.isoformat(), duplicate_id),
             )
             self._conn.execute("DELETE FROM person_search WHERE person_id = ?", (duplicate_id,))
-            self._checkpoint("before_audit")
-            self._insert_audit(audit_factory(counts))
-        return counts
 
-    def forget_person(
-        self,
-        person_id: str,
-        audit_factory: Callable[[dict[str, int]], AuditEntry],
-    ) -> dict[str, int]:
-        """Hard-delete a person graph, redact prior audits, and add one tombstone."""
+            changes = self._merge_changes(
+                primary,
+                primary_before,
+                duplicate_id,
+                linked_ids,
+                relationship_rows,
+                participation_ids,
+                people,
+                records,
+            )
+            manifest = {
+                "primary_id": primary.id,
+                "duplicate_id": duplicate_id,
+                "final_primary": primary.model_dump(mode="json"),
+                "affected_rows": [
+                    {
+                        "entity_type": change.entity_type,
+                        "entity_id": change.entity_id,
+                        "op_kind": change.op_kind,
+                        "changed_fields": change.changed_fields,
+                    }
+                    for change in changes
+                ],
+                "removed_relationship_ids": [
+                    row["id"] for row in relationship_rows if records.get_record("relationship", row["id"]) is None
+                ],
+                "duplicate_tombstone": (people.get(duplicate_id) or primary).model_dump(mode="json"),
+            }
+            self._checkpoint("before_audit")
+        return MergeStoreResult(counts=counts, changes=changes, manifest=manifest)
+
+    def forget_person(self, person_id: str) -> dict[str, int]:
+        """Hard-delete a person graph and redact prior accountability entries."""
         with SqliteUnitOfWork(self._conn):
             counts = self.preview_person_forget(person_id)
             orphan_ids = [
@@ -84,16 +148,10 @@ class SqliteLifecycleStore:
                 )
             counts["interactions"] = len(orphan_ids)
             self._checkpoint("before_audit")
-            self._insert_audit(audit_factory(counts))
         return counts
 
-    def forget_record(
-        self,
-        entity_type: str,
-        entity_id: str,
-        audit_factory: Callable[[dict[str, int]], AuditEntry],
-    ) -> dict[str, int]:
-        """Hard-delete one assertion/reminder/interaction and add one tombstone."""
+    def forget_record(self, entity_type: str, entity_id: str) -> dict[str, int]:
+        """Hard-delete one assertion/reminder/interaction and redact its audits."""
         tables = {
             "relationship": "relationships",
             "affiliation": "affiliations",
@@ -124,7 +182,6 @@ class SqliteLifecycleStore:
                 (entity_id,),
             )
             self._checkpoint("before_audit")
-            self._insert_audit(audit_factory(deleted))
         return deleted
 
     def preview_person_forget(self, person_id: str) -> dict[str, int]:
@@ -159,6 +216,93 @@ class SqliteLifecycleStore:
             (person_id,),
         ).fetchone()[0]
         return counts
+
+    def _merge_changes(
+        self,
+        primary: Person,
+        primary_before: Person | None,
+        duplicate_id: str,
+        linked_ids: dict[str, list[str]],
+        relationship_rows: list[sqlite3.Row],
+        participation_ids: list[str],
+        people: SqlitePeopleRepository,
+        records: SqliteRecordStore,
+    ) -> list[LifecycleChange]:
+        changes: list[LifecycleChange] = []
+        primary_payload = primary.model_dump(mode="json")
+        before_payload = primary_before.model_dump(mode="json") if primary_before is not None else {}
+        changes.append(
+            LifecycleChange(
+                entity_type="person",
+                entity_id=primary.id,
+                op_kind="update",
+                payload=primary_payload,
+                changed_fields=sorted(
+                    key for key in primary_payload if primary_payload.get(key) != before_payload.get(key)
+                ),
+            )
+        )
+        duplicate = people.get(duplicate_id)
+        if duplicate is not None:
+            changes.append(
+                LifecycleChange(
+                    entity_type="person",
+                    entity_id=duplicate_id,
+                    op_kind="update",
+                    payload=duplicate.model_dump(mode="json"),
+                    changed_fields=["deleted_at", "is_self", "updated_at"],
+                )
+            )
+        for entity_type, entity_ids in linked_ids.items():
+            for entity_id in entity_ids:
+                record = records.get_record(entity_type, entity_id)
+                if record is not None:
+                    changes.append(
+                        LifecycleChange(
+                            entity_type=entity_type,
+                            entity_id=entity_id,
+                            op_kind="update",
+                            payload=record.model_dump(mode="json"),
+                            changed_fields=["person_id"],
+                        )
+                    )
+        for row in relationship_rows:
+            record = records.get_record("relationship", row["id"])
+            if record is None:
+                changes.append(
+                    LifecycleChange(
+                        entity_type="relationship",
+                        entity_id=row["id"],
+                        op_kind="merge",
+                        payload={"id": row["id"], "deleted": True},
+                    )
+                )
+                continue
+            changed_fields = []
+            if record.subject_id != row["subject_id"]:
+                changed_fields.append("subject_id")
+            if record.object_id != row["object_id"]:
+                changed_fields.append("object_id")
+            changes.append(
+                LifecycleChange(
+                    entity_type="relationship",
+                    entity_id=row["id"],
+                    op_kind="update",
+                    payload=record.model_dump(mode="json"),
+                    changed_fields=changed_fields,
+                )
+            )
+        for interaction_id in participation_ids:
+            changes.append(
+                LifecycleChange(
+                    entity_type="interaction_participant",
+                    entity_id=f"{interaction_id}:{primary.id}",
+                    op_kind="update",
+                    payload={"interaction_id": interaction_id, "person_id": primary.id},
+                    changed_fields=["person_id"],
+                )
+            )
+        return changes
 
     def _save_primary(self, person: Person, duplicate_id: str) -> None:
         self._conn.execute(
@@ -195,6 +339,15 @@ class SqliteLifecycleStore:
             "INSERT INTO person_search (name, person_id) VALUES (?, ?)",
             [(name, person.id) for name in person.all_names()],
         )
+
+    def _ids_for_person(self, table: str, person_id: str) -> list[str]:
+        return [
+            row["id"]
+            for row in self._conn.execute(
+                f"SELECT id FROM {table} WHERE person_id = ? ORDER BY id",  # noqa: S608
+                (person_id,),
+            ).fetchall()
+        ]
 
     def _reparent(self, table: str, duplicate_id: str, primary_id: str) -> int:
         cursor = self._conn.execute(
@@ -240,24 +393,7 @@ class SqliteLifecycleStore:
                 )
         return len(rows)
 
-    def _insert_audit(self, entry: AuditEntry) -> None:
-        self._conn.execute(
-            """INSERT INTO audit_log (id, ts, op, entity_type, entity_id, payload_json, source)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                entry.id,
-                entry.ts.isoformat(),
-                entry.op,
-                entry.entity_type,
-                entry.entity_id,
-                json.dumps(entry.payload),
-                entry.source,
-            ),
-        )
-
     def _redact_audits(self, entity_id: str, forgotten_person_id: str | None) -> None:
-        # Payload references can be nested at arbitrary depths. Decode every audit rather than using SQL LIKE,
-        # which cannot distinguish exact scalar IDs and would miss JSON structure semantics.
         rows = self._conn.execute("SELECT id, entity_id, payload_json FROM audit_log").fetchall()
         for row in rows:
             payload = json.loads(row["payload_json"])

@@ -70,5 +70,7 @@ class RecordFact:
             entity_id=fact.id,
             payload=snapshot(fact),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return fact

@@ -67,5 +67,7 @@ class RecordTrait:
             entity_id=trait.id,
             payload=snapshot(trait),
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return trait

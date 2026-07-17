@@ -82,6 +82,8 @@ class EditPerson:
             entity_type="person",
             entity_id=person.id,
             payload={"before": before, "after": snapshot(person), "fields": fields},
+            replay_payload=snapshot(person),
+            changed_fields=[*fields, "updated_at"],
             source=data.source,
         )
         return person

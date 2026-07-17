@@ -8,9 +8,11 @@ from typing import Any, ParamSpec, TypeVar, cast
 
 from pydantic import BaseModel
 
-from people_context.domain.shared import Provenance
+from people_context.domain.shared import Provenance, new_id
 from people_context.ports.audit_log import AuditEntry, AuditLog
+from people_context.ports.changelog import Changelog, ChangelogEntry
 from people_context.ports.clock import Clock
+from people_context.ports.hlc import HybridLogicalClock
 from people_context.ports.repository import PersonReader
 from people_context.ports.unit_of_work import NullUnitOfWork, UnitOfWork
 
@@ -110,8 +112,15 @@ def audit_mutation(
     entity_id: str,
     payload: dict[str, Any],
     source: str,
-) -> None:
-    """Append one audit entry for one mutated row."""
+    replay_payload: dict[str, Any] | None = None,
+    changed_fields: list[str] | None = None,
+    op_kind: str | None = None,
+    transaction_id: str | None = None,
+    session: str | None = None,
+    stated_by: str | None = None,
+) -> str:
+    """Append accountability and full replay records through one application seam."""
+    transaction_id = transaction_id or new_id()
     audit.append(
         AuditEntry(
             ts=clock.now(),
@@ -122,6 +131,67 @@ def audit_mutation(
             source=source,
         )
     )
+    changelog_mutation(
+        audit,
+        clock,
+        entity_type=entity_type,
+        entity_id=entity_id,
+        op_kind=op_kind or op,
+        payload=replay_payload if replay_payload is not None else payload,
+        changed_fields=changed_fields if changed_fields is not None else _payload_fields(payload),
+        transaction_id=transaction_id,
+        source=source,
+        session=session,
+        stated_by=stated_by,
+    )
+    return transaction_id
+
+
+def changelog_mutation(
+    audit: AuditLog,
+    clock: Clock,
+    *,
+    entity_type: str,
+    entity_id: str,
+    op_kind: str,
+    payload: dict[str, Any],
+    changed_fields: list[str],
+    transaction_id: str,
+    source: str,
+    session: str | None = None,
+    stated_by: str | None = None,
+) -> None:
+    """Append a replay-only child operation when the adapter exposes sync foundations."""
+    changelog = cast(Changelog | None, getattr(audit, "changelog", None))
+    hybrid_clock = cast(HybridLogicalClock | None, getattr(audit, "hybrid_clock", None))
+    if changelog is None or hybrid_clock is None:
+        return
+    hlc = hybrid_clock.tick()
+    actor = {"source": source}
+    if session is not None:
+        actor["session"] = session
+    if stated_by is not None:
+        actor["stated_by"] = stated_by
+    changelog.append(
+        ChangelogEntry(
+            device_id=hybrid_clock.device_id,
+            hlc_physical_ms=hlc.physical_ms,
+            hlc_logical=hlc.logical_counter,
+            transaction_id=transaction_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            op_kind=op_kind,
+            payload=payload,
+            changed_fields=sorted(set(changed_fields)),
+            actor=actor,
+            inserted_at=clock.now(),
+        )
+    )
+
+
+def _payload_fields(payload: dict[str, Any]) -> list[str]:
+    fields = payload.get("fields", [])
+    return [str(field) for field in fields] if isinstance(fields, list) else []
 
 
 def snapshot(model: BaseModel) -> dict[str, Any]:

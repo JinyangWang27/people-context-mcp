@@ -17,7 +17,7 @@ from people_context.app.write_support import (
     unit_of_work_for,
 )
 from people_context.domain.organization import Affiliation, Organization
-from people_context.domain.shared import Confidence, ValidityPeriod, normalize_name
+from people_context.domain.shared import Confidence, ValidityPeriod, new_id, normalize_name
 from people_context.ports.audit_log import AuditLog
 from people_context.ports.clock import Clock
 from people_context.ports.records import OrganizationStore, RecordWriter
@@ -62,6 +62,7 @@ class SetAffiliation:
     def execute(self, data: SetAffiliationInput) -> Affiliation:
         """Create and audit an affiliation, auditing organization creation separately."""
         require_active_person(self._people, data.person_id)
+        transaction_id = new_id()
         organization = self._organizations.get(data.org)
         if organization is None and _ULID_PATTERN.fullmatch(data.org):
             raise OrganizationNotFoundError(data.org)
@@ -78,6 +79,9 @@ class SetAffiliation:
                 entity_id=organization.id,
                 payload=snapshot(organization),
                 source=data.source,
+                transaction_id=transaction_id,
+                session=data.session,
+                stated_by=data.stated_by,
             )
         affiliation = Affiliation(
             person_id=data.person_id,
@@ -97,5 +101,8 @@ class SetAffiliation:
             entity_id=affiliation.id,
             payload=snapshot(affiliation),
             source=data.source,
+            transaction_id=transaction_id,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return affiliation

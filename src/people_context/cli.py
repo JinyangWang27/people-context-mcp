@@ -86,6 +86,7 @@ def _open_context(db: str | None) -> CliContext:
         )
         semantic_updater = None
     if semantic_updater is not None:
+
         def warn(message: str) -> None:
             print(f"Warning: {message}", file=sys.stderr)
 
@@ -243,9 +244,7 @@ def _cmd_show(ctx: CliContext, args: argparse.Namespace) -> int:
     person, exit_code = _resolve_person(ctx, args.person)
     if person is None:
         return exit_code
-    context = GetPersonContext(ctx.repo, ctx.context_reader, ctx.clock).execute(
-        person.id, include_sensitive=True
-    )
+    context = GetPersonContext(ctx.repo, ctx.context_reader, ctx.clock).execute(person.id, include_sensitive=True)
     _print_context(context)
     return 0
 
@@ -384,7 +383,7 @@ def _cmd_delete(ctx: CliContext, args: argparse.Namespace) -> int:
     if not args.yes and input("Proceed? [y/N] ").strip().casefold() not in {"y", "yes"}:
         print("Aborted.")
         return 0
-    Forget(ctx.repo, ctx.lifecycle, ctx.clock).execute(person.id, "person")
+    Forget(ctx.repo, ctx.lifecycle, ctx.clock, ctx.audit).execute(person.id, "person")
     print("Deleted.")
     return 0
 

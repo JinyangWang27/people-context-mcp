@@ -68,6 +68,10 @@ class CompleteReminder:
             entity_type="reminder",
             entity_id=updated.id,
             payload={"before": before, "after": snapshot(updated), "fields": ["status"]},
+            replay_payload=snapshot(updated),
+            changed_fields=["status"],
             source=data.source,
+            session=data.session,
+            stated_by=data.stated_by,
         )
         return updated
