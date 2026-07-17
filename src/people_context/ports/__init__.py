@@ -6,6 +6,7 @@ from people_context.ports.audit_log import AuditEntry, AuditLog
 from people_context.ports.clock import Clock, SystemClock
 from people_context.ports.context import AffiliationRecord, PersonContextReader, RelationshipRecord
 from people_context.ports.export import ExportReader, ExportSnapshot
+from people_context.ports.hlc import HlcTimestamp, HybridLogicalClock
 from people_context.ports.lifecycle import LifecycleStore
 from people_context.ports.records import OrganizationStore, PreferencesStore, Record, RecordReader, RecordWriter
 from people_context.ports.repository import PersonReader, PersonSearchIndexer, PersonWriter, SearchHit
@@ -31,6 +32,8 @@ __all__ = [
     "ExportReader",
     "ExportSnapshot",
     "EmbeddingProvider",
+    "HlcTimestamp",
+    "HybridLogicalClock",
     "LifecycleStore",
     "NullUnitOfWork",
     "PersonReader",
