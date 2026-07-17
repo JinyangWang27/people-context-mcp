@@ -85,6 +85,15 @@ class SqlitePeopleRepository:
             [(name, person.id) for name in person.all_names()],
         )
 
+    def rebuild_person_search(self) -> tuple[int, int]:
+        """Rebuild FTS rows from active people and aliases in one transaction."""
+        people = self.list_people()
+        names = [(name, person.id) for person in people for name in person.all_names()]
+        with self._conn:
+            self._conn.execute("DELETE FROM person_search")
+            self._conn.executemany("INSERT INTO person_search (name, person_id) VALUES (?, ?)", names)
+        return len(people), len(names)
+
     # -- PersonReader ----------------------------------------------------
 
     def get(self, person_id: str) -> Person | None:

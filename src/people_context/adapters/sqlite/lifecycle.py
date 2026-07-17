@@ -143,7 +143,14 @@ class SqliteLifecycleStore:
             "SELECT COUNT(*) FROM interaction_participants WHERE person_id = ?",
             (person_id,),
         ).fetchone()[0]
-        counts["interactions"] = 0
+        counts["interactions"] = self._conn.execute(
+            """SELECT COUNT(*)
+               FROM interaction_participants ip
+               WHERE ip.person_id = ?
+                 AND (SELECT COUNT(*) FROM interaction_participants all_ip
+                      WHERE all_ip.interaction_id = ip.interaction_id) = 1""",
+            (person_id,),
+        ).fetchone()[0]
         return counts
 
     def _save_primary(self, person: Person, duplicate_id: str) -> None:

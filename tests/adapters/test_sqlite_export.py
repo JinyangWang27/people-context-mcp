@@ -10,6 +10,7 @@ from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqliteContextReader,
     SqliteExportReader,
+    SqliteLifecycleStore,
     SqlitePeopleRepository,
     SqlitePreferencesStore,
     SqliteRecordStore,
@@ -86,6 +87,9 @@ def test_cli_and_use_case_emit_byte_equivalent_payload_with_fixed_clock(capsys) 
         context_reader=SqliteContextReader(conn),
         clock=_Clock(),
         export_reader=export_reader,
+        audit=SqliteAuditLog(conn),
+        lifecycle=SqliteLifecycleStore(conn),
+        preferences=SqlitePreferencesStore(conn),
     )
     expected = json.dumps(
         ExportData(export_reader, _Clock()).execute().model_dump(mode="json"),
