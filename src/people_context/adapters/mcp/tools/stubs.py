@@ -36,11 +36,6 @@ def register(mcp: FastMCP) -> None:
         return _pending("M3")
 
     @mcp.tool(annotations=_DESTRUCTIVE)
-    def merge_people(primary_id: str, duplicate_id: str) -> dict[str, Any]:
-        """Merge a duplicate person into a primary person."""
-        return _pending("M3")
-
-    @mcp.tool(annotations=_DESTRUCTIVE)
     def forget(target: str, scope: str) -> dict[str, Any]:
         """Hard-delete a target and retain only an audit tombstone."""
         return _pending("M3")

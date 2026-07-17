@@ -116,6 +116,33 @@ def test_m3_stub_remains_not_implemented(tmp_path: Path) -> None:
     assert payload == {"status": "not_implemented", "planned_milestone": "M3"}
 
 
+def test_merge_people_tool_is_real_and_returns_structured_errors(tmp_path: Path) -> None:
+    db_path = tmp_path / "merge.db"
+    conn = open_db(db_path)
+    repo = SqlitePeopleRepository(conn)
+    primary = Person(canonical_name="Alice")
+    duplicate = Person(canonical_name="Alice Smith")
+    repo.save_person(primary)
+    repo.save_person(duplicate)
+    conn.close()
+    server = build_server(db_path=db_path)
+
+    async def flow(client: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
+        invalid = await client.call_tool(
+            "merge_people", {"primary_id": primary.id, "duplicate_id": primary.id}
+        )
+        merged = await client.call_tool(
+            "merge_people", {"primary_id": primary.id, "duplicate_id": duplicate.id}
+        )
+        return invalid.structuredContent, merged.structuredContent
+
+    invalid, merged = _run(server, flow)
+
+    assert invalid["error"] == "same_person"
+    assert merged["person"]["id"] == primary.id
+    assert merged["self_loops_removed"] == 0
+
+
 def test_m2_write_read_curation_and_guidance_flow(tmp_path: Path) -> None:
     db_path = tmp_path / "m2.db"
     server = build_server(db_path=db_path)

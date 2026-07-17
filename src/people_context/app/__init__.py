@@ -14,6 +14,7 @@ from people_context.app.get_person_context import (
     PersonRelationshipContext,
 )
 from people_context.app.list_reminders import ListReminders, ListRemindersInput
+from people_context.app.merge_people import MergeMovedCounts, MergePeople, MergePeopleError, MergePeopleResult
 from people_context.app.record import (
     AliasInput,
     AmbiguousPersonError,
@@ -54,6 +55,10 @@ __all__ = [
     "GetCommunicationGuidance",
     "ListReminders",
     "ListRemindersInput",
+    "MergeMovedCounts",
+    "MergePeople",
+    "MergePeopleError",
+    "MergePeopleResult",
     "CompleteReminder",
     "CompleteReminderInput",
     "CorrectRecord",
