@@ -118,6 +118,8 @@ def audit_mutation(
     transaction_id: str | None = None,
     session: str | None = None,
     stated_by: str | None = None,
+    changelog_entity_type: str | None = None,
+    changelog_entity_id: str | None = None,
 ) -> str:
     """Append accountability and full replay records through one application seam."""
     transaction_id = transaction_id or new_id()
@@ -134,8 +136,8 @@ def audit_mutation(
     changelog_mutation(
         audit,
         clock,
-        entity_type=entity_type,
-        entity_id=entity_id,
+        entity_type=changelog_entity_type or entity_type,
+        entity_id=changelog_entity_id or entity_id,
         op_kind=op_kind or op,
         payload=replay_payload if replay_payload is not None else payload,
         changed_fields=changed_fields if changed_fields is not None else _payload_fields(payload),

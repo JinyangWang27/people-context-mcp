@@ -24,6 +24,24 @@ class LifecycleChange:
 
 
 @dataclass(frozen=True)
+class AffectedEntity:
+    """Stable identity of a row or join-row affected by forget."""
+
+    entity_type: str
+    entity_id: str
+
+
+@dataclass(frozen=True)
+class ForgetStoreResult:
+    """Local deletion/redaction outcome used to construct a safe tombstone."""
+
+    deleted: dict[str, int]
+    affected_entities: list[AffectedEntity]
+    covered_op_ids: list[str]
+    covered_transaction_ids: list[str]
+
+
+@dataclass(frozen=True)
 class MergeStoreResult:
     """Exact local effects and user-facing counts from one merge."""
 
@@ -38,8 +56,8 @@ class LifecycleStore(Protocol):
 
     def merge_people(self, primary: Person, duplicate_id: str) -> MergeStoreResult: ...
 
-    def forget_person(self, person_id: str) -> dict[str, int]: ...
+    def forget_person(self, person_id: str) -> ForgetStoreResult: ...
 
-    def forget_record(self, entity_type: str, entity_id: str) -> dict[str, int]: ...
+    def forget_record(self, entity_type: str, entity_id: str) -> ForgetStoreResult: ...
 
     def preview_person_forget(self, person_id: str) -> dict[str, int]: ...

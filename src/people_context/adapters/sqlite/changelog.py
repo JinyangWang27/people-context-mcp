@@ -45,6 +45,32 @@ class SqliteChangelog:
                 ),
             )
 
+    def redact_covered(self, target_ids: set[str]) -> tuple[list[str], list[str]]:
+        """Redact covered operation groups while retaining prior forget tombstones."""
+        rows = self._conn.execute(
+            "SELECT op_id, transaction_id, entity_id, op_kind, payload_json FROM changelog"
+        ).fetchall()
+        covered_transactions = {
+            row["transaction_id"]
+            for row in rows
+            if row["op_kind"] != "forget"
+            and (row["entity_id"] in target_ids or _contains_any(json.loads(row["payload_json"]), target_ids))
+        }
+        if not covered_transactions:
+            return [], []
+        covered_ops = [
+            row["op_id"] for row in rows if row["op_kind"] != "forget" and row["transaction_id"] in covered_transactions
+        ]
+        marker = json.dumps({"redacted": True})
+        with SqliteUnitOfWork(self._conn):
+            self._conn.executemany(
+                """UPDATE changelog
+                   SET payload_json = ?, changed_fields_json = '[]', actor_json = ?
+                   WHERE op_id = ?""",
+                [(marker, marker, op_id) for op_id in covered_ops],
+            )
+        return sorted(covered_ops), sorted(covered_transactions)
+
     def list_entries(self, limit: int = 100, entity_id: str | None = None) -> list[ChangelogEntry]:
         clauses = "WHERE entity_id = ?" if entity_id is not None else ""
         params: tuple[object, ...] = (entity_id, limit) if entity_id is not None else (limit,)
@@ -72,3 +98,11 @@ class SqliteChangelog:
             schema_version=row["schema_version"],
             inserted_at=datetime.fromisoformat(row["inserted_at"]),
         )
+
+
+def _contains_any(value: object, targets: set[str]) -> bool:
+    if isinstance(value, dict):
+        return any(_contains_any(item, targets) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_any(item, targets) for item in value)
+    return isinstance(value, str) and value in targets

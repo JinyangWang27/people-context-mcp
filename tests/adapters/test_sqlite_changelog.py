@@ -209,3 +209,120 @@ def test_merge_rolls_back_when_child_changelog_capture_fails() -> None:
     assert records.get_record("fact", fact.id).person_id == duplicate.id
     assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == audit_count
     assert conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0] == changelog_count
+
+
+def test_merge_then_forget_redacts_all_person_content_and_retains_id_only_tombstone() -> None:
+    sentinel = "FORGOTTEN-SENTINEL-7f42"
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    records = SqliteRecordStore(conn)
+    audit = SqliteAuditLog(conn)
+    clock = _Clock()
+    remember = RememberPerson(people, people, audit, clock)
+    primary = remember.execute(RememberPersonInput(name="Primary", summary=sentinel)).person
+    duplicate = remember.execute(RememberPersonInput(name="Duplicate")).person
+    fact = RecordFact(people, records, audit, clock).execute(
+        RecordFactInput(person_id=duplicate.id, predicate="private", value=sentinel)
+    )
+    MergePeople(people, SqliteLifecycleStore(conn), clock, audit).execute(primary.id, duplicate.id)
+
+    from people_context.app import Forget
+
+    Forget(people, SqliteLifecycleStore(conn), clock, audit).execute(primary.id, "person")
+
+    payloads = [row["payload_json"] for row in conn.execute("SELECT payload_json FROM changelog").fetchall()]
+    assert all(sentinel not in payload for payload in payloads)
+    tombstone = next(entry for entry in SqliteChangelog(conn).list_entries() if entry.op_kind == "forget")
+    assert tombstone.entity_type == "person"
+    assert tombstone.entity_id == primary.id
+    assert tombstone.payload["target_id"] == primary.id
+    assert {item["entity_id"] for item in tombstone.payload["affected_entities"]} >= {primary.id, fact.id}
+    assert not ({"name", "canonical_name", "summary", "value", "text"} & _nested_keys(tombstone.payload))
+    merge_rows = conn.execute(
+        "SELECT payload_json FROM changelog WHERE transaction_id IN (?)",
+        (next(entry.transaction_id for entry in SqliteChangelog(conn).list_entries() if entry.op_kind == "merge"),),
+    ).fetchall()
+    assert merge_rows and all(row["payload_json"] == '{"redacted": true}' for row in merge_rows)
+
+    before_count = conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0]
+    from people_context.app.write_support import PersonNotFoundError
+
+    with pytest.raises(PersonNotFoundError):
+        RecordFact(people, records, audit, clock).execute(
+            RecordFactInput(person_id=primary.id, predicate="late", value=sentinel)
+        )
+    assert conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0] == before_count
+
+
+def test_record_then_person_forget_keeps_both_tombstones_and_no_record_content() -> None:
+    sentinel = "RECORD-SENTINEL-9182"
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    records = SqliteRecordStore(conn)
+    audit = SqliteAuditLog(conn)
+    clock = _Clock()
+    person = RememberPerson(people, people, audit, clock).execute(RememberPersonInput(name="Alice")).person
+    fact = RecordFact(people, records, audit, clock).execute(
+        RecordFactInput(person_id=person.id, predicate="secret", value=sentinel)
+    )
+    from people_context.app import Forget
+
+    forget = Forget(people, SqliteLifecycleStore(conn), clock, audit)
+    forget.execute(f"fact:{fact.id}", "record")
+    forget.execute(person.id, "person")
+
+    tombstones = [entry for entry in SqliteChangelog(conn).list_entries() if entry.op_kind == "forget"]
+    assert {(entry.entity_type, entry.entity_id) for entry in tombstones} == {
+        ("fact", fact.id),
+        ("person", person.id),
+    }
+    assert all(sentinel not in row["payload_json"] for row in conn.execute("SELECT payload_json FROM changelog"))
+
+
+def test_forget_rolls_back_deletion_redaction_audit_hlc_and_tombstone_on_capture_failure() -> None:
+    sentinel = "ROLLBACK-SENTINEL-54ab"
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    records = SqliteRecordStore(conn)
+    audit = SqliteAuditLog(conn)
+    clock = _Clock()
+    person = (
+        RememberPerson(people, people, audit, clock)
+        .execute(RememberPersonInput(name="Atomic Alice", summary=sentinel))
+        .person
+    )
+    fact = RecordFact(people, records, audit, clock).execute(
+        RecordFactInput(person_id=person.id, predicate="secret", value=sentinel)
+    )
+    before_audit = conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0]
+    before_changelog = conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0]
+    before_hlc = tuple(
+        conn.execute("SELECT hlc_physical_ms, hlc_logical FROM devices WHERE retired_at IS NULL").fetchone()
+    )
+
+    def fail(_: str) -> None:
+        raise RuntimeError("forget changelog failure")
+
+    from people_context.app import Forget
+
+    lifecycle = SqliteLifecycleStore(conn, changelog_failure_hook=fail)
+    with pytest.raises(RuntimeError, match="forget changelog failure"):
+        Forget(people, lifecycle, clock).execute(person.id, "person")
+
+    assert people.get(person.id) is not None
+    assert records.get_record("fact", fact.id) is not None
+    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == before_audit
+    assert conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0] == before_changelog
+    assert (
+        tuple(conn.execute("SELECT hlc_physical_ms, hlc_logical FROM devices WHERE retired_at IS NULL").fetchone())
+        == before_hlc
+    )
+    assert any(sentinel in row["payload_json"] for row in conn.execute("SELECT payload_json FROM changelog"))
+
+
+def _nested_keys(value: object) -> set[str]:
+    if isinstance(value, dict):
+        return set(value) | {key for item in value.values() for key in _nested_keys(item)}
+    if isinstance(value, list):
+        return {key for item in value for key in _nested_keys(item)}
+    return set()

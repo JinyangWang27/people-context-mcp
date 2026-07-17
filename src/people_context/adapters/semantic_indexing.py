@@ -15,7 +15,7 @@ from people_context.domain.person import Person
 from people_context.domain.relationship import Relationship
 from people_context.domain.reminder import Reminder, ReminderStatus
 from people_context.domain.trait import Trait
-from people_context.ports.lifecycle import LifecycleStore, MergeStoreResult
+from people_context.ports.lifecycle import ForgetStoreResult, LifecycleStore, MergeStoreResult
 from people_context.ports.records import Record, RecordReader, RecordWriter
 from people_context.ports.repository import PersonReader, PersonSearchIndexer, PersonWriter, SearchHit
 
@@ -159,12 +159,12 @@ class IndexingLifecycleStore:
         self._best_effort(lambda: self._updater.delete(duplicate_id))
         return result
 
-    def forget_person(self, person_id: str) -> dict[str, int]:
+    def forget_person(self, person_id: str) -> ForgetStoreResult:
         counts = self._delegate.forget_person(person_id)
         self._best_effort(lambda: self._updater.delete(person_id))
         return counts
 
-    def forget_record(self, entity_type: str, entity_id: str) -> dict[str, int]:
+    def forget_record(self, entity_type: str, entity_id: str) -> ForgetStoreResult:
         counts = self._delegate.forget_record(entity_type, entity_id)
         self._best_effort(lambda: self._updater.delete(entity_id))
         return counts
