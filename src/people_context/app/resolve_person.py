@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from people_context.domain.person import Person
 from people_context.domain.shared import normalize_name
@@ -38,6 +38,8 @@ class ResolutionResult(BaseModel):
 class ResolutionHints(BaseModel):
     """Optional organization, role, and relationship context for re-ranking."""
 
+    model_config = ConfigDict(extra="forbid")
+
     org: str | None = None
     role: str | None = None
     relationship: str | None = None
@@ -67,9 +69,7 @@ class ResolvePerson:
         self._context_reader = context_reader
         self._clock = clock
 
-    def execute(
-        self, query: str, limit: int = 5, hints: ResolutionHints | None = None
-    ) -> ResolutionResult:
+    def execute(self, query: str, limit: int = 5, hints: ResolutionHints | None = None) -> ResolutionResult:
         """Run exact, search, and guarded fuzzy stages before ranking candidates."""
         best: dict[str, ResolutionCandidate] = {}
         normalized_query = normalize_name(query)
@@ -84,11 +84,7 @@ class ResolvePerson:
             strongest_search_score = max(strongest_search_score, score)
             self._offer(best, _candidate(hit.person, score, f"search:{hit.match_kind}"))
 
-        if (
-            not exact_people
-            and len(normalized_query) >= _MIN_FUZZY_QUERY_LENGTH
-            and strongest_search_score < 0.5
-        ):
+        if not exact_people and len(normalized_query) >= _MIN_FUZZY_QUERY_LENGTH and strongest_search_score < 0.5:
             for person in self._reader.list_people():
                 distances = (
                     _bounded_levenshtein(normalized_query, normalize_name(name), max_distance=2)
@@ -99,10 +95,7 @@ class ResolvePerson:
                     self._offer(best, _candidate(person, _FUZZY_SCORES[distance], "fuzzy"))
 
         if hints is not None and self._context_reader is not None and self._clock is not None:
-            best = {
-                person_id: self._boost_with_hints(candidate, hints)
-                for person_id, candidate in best.items()
-            }
+            best = {person_id: self._boost_with_hints(candidate, hints) for person_id, candidate in best.items()}
 
         candidates = [c for c in best.values() if c.score >= _MIN_SCORE]
         candidates.sort(key=lambda c: (-c.score, c.canonical_name))
@@ -117,12 +110,14 @@ class ResolvePerson:
         if existing is None or candidate.score > existing.score:
             best[candidate.person_id] = candidate
 
-    def _boost_with_hints(
-        self, candidate: ResolutionCandidate, hints: ResolutionHints
-    ) -> ResolutionCandidate:
-        as_of = self._clock.now().date()
-        affiliations = self._context_reader.list_active_affiliations(candidate.person_id, as_of)
-        relationships = self._context_reader.list_active_relationships(candidate.person_id, as_of)
+    def _boost_with_hints(self, candidate: ResolutionCandidate, hints: ResolutionHints) -> ResolutionCandidate:
+        context_reader = self._context_reader
+        clock = self._clock
+        if context_reader is None or clock is None:
+            return candidate
+        as_of = clock.now().date()
+        affiliations = context_reader.list_active_affiliations(candidate.person_id, as_of)
+        relationships = context_reader.list_active_relationships(candidate.person_id, as_of)
         matched_kinds: list[str] = []
 
         if hints.org and any(_substring_match(hints.org, record.organization_name) for record in affiliations):

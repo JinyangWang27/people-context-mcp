@@ -32,22 +32,6 @@ def register(mcp: FastMCP) -> None:
     # ---- Read-only stubs -------------------------------------------------
 
     @mcp.tool(annotations=_READ_ONLY)
-    def get_person_context(
-        person_id: str,
-        purpose: str | None = None,
-        max_items: int | None = None,
-        include_sensitive: bool = False,
-    ) -> dict[str, Any]:
-        """Assemble a minimal-disclosure context bundle for one person.
-
-        Returns identity, active relationships/roles, and a capped, ranked slice of
-        the most relevant facts/interactions — never a full dump. `purpose` hints
-        why context is needed, `max_items` is a disclosure budget, and sensitive
-        items are excluded unless `include_sensitive` is set. (Not yet implemented.)
-        """
-        return _pending("M1")
-
-    @mcp.tool(annotations=_READ_ONLY)
     def get_communication_guidance(person_id: str, situation: str | None = None) -> dict[str, Any]:
         """Return structured signal for composing communication advice about a person.
 

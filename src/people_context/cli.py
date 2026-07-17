@@ -13,8 +13,8 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from people_context.adapters.sqlite import SqlitePeopleRepository, open_db
-from people_context.app import ResolvePerson, SearchPeople
+from people_context.adapters.sqlite import SqliteContextReader, SqlitePeopleRepository, open_db
+from people_context.app import GetPersonContext, PersonContextResult, ResolvePerson, SearchPeople
 from people_context.config import describe_resolution, resolve_db_path
 from people_context.domain.person import Person
 from people_context.ports.clock import SystemClock
@@ -28,11 +28,18 @@ class CliContext:
 
     conn: sqlite3.Connection
     repo: SqlitePeopleRepository
+    context_reader: SqliteContextReader
+    clock: SystemClock
 
 
 def _open_context(db: str | None) -> CliContext:
     conn = open_db(resolve_db_path(db))
-    return CliContext(conn=conn, repo=SqlitePeopleRepository(conn))
+    return CliContext(
+        conn=conn,
+        repo=SqlitePeopleRepository(conn),
+        context_reader=SqliteContextReader(conn),
+        clock=SystemClock(),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -136,11 +143,12 @@ def _cmd_search(ctx: CliContext, args: argparse.Namespace) -> int:
 
 def _cmd_show(ctx: CliContext, args: argparse.Namespace) -> int:
     person = ctx.repo.get(args.person)
-    if person is not None:
-        _print_person(person)
+    if person is not None and person.deleted_at is None:
+        context = GetPersonContext(ctx.repo, ctx.context_reader, ctx.clock).execute(person.id, include_sensitive=True)
+        _print_context(context)
         return 0
 
-    result = ResolvePerson(ctx.repo).execute(args.person)
+    result = ResolvePerson(ctx.repo, ctx.context_reader, ctx.clock).execute(args.person)
     if not result.candidates:
         print(f"No person found matching '{args.person}'.", file=sys.stderr)
         return 1
@@ -154,34 +162,59 @@ def _cmd_show(ctx: CliContext, args: argparse.Namespace) -> int:
             )
         return 2
 
-    resolved = ctx.repo.get(result.candidates[0].person_id)
-    if resolved is None:
+    context = GetPersonContext(ctx.repo, ctx.context_reader, ctx.clock).execute(
+        result.candidates[0].person_id, include_sensitive=True
+    )
+    if not context.found:
         print(f"No person found matching '{args.person}'.", file=sys.stderr)
         return 1
-    _print_person(resolved)
+    _print_context(context)
     return 0
 
 
-def _print_person(person: Person) -> None:
-    deleted_marker = " [deleted]" if person.deleted_at else ""
-    print(f"{person.canonical_name}{deleted_marker} ({person.id})")
-    print(f"  self: {person.is_self}")
-    print(f"  summary: {person.summary or '(none)'}")
-    print(f"  created: {person.created_at.isoformat()}")
-    print(f"  updated: {person.updated_at.isoformat()}")
-    if person.deleted_at:
-        print(f"  deleted: {person.deleted_at.isoformat()}")
-    if person.aliases:
+def _print_context(context: PersonContextResult) -> None:
+    identity = context.identity
+    if identity is None:
+        return
+    print(f"{identity.canonical_name} ({identity.id})")
+    print(f"  self: {identity.is_self}")
+    print(f"  summary: {identity.summary or '(none)'}")
+    if identity.aliases:
         print("  aliases:")
-        for alias in person.aliases:
-            tags = "/".join(tag for tag in (alias.lang, alias.script) if tag)
-            suffix = f" [{tags}]" if tags else ""
-            print(f"    - {alias.value} ({alias.kind.value}){suffix}")
+        for alias in identity.aliases:
+            print(f"    - {alias}")
     else:
         print("  aliases: (none)")
-    print()
-    print("Extended context (relationships, facts, traits, reminders) is not yet available;")
-    print("it lands in later milestones.")
+    _print_section(
+        "relationships",
+        [
+            f"{record.relationship.type}: {record.other_person_name} ({record.other_person_id})"
+            + (f" — {record.relationship.label}" if record.relationship.label else "")
+            for record in context.relationships
+        ],
+    )
+    _print_section(
+        "affiliations",
+        [f"{record.affiliation.role} at {record.organization_name}" for record in context.affiliations],
+    )
+    _print_section("facts", [f"{fact.predicate}: {fact.value}" for fact in context.facts])
+    _print_section(
+        "interactions",
+        [
+            f"{interaction.occurred_at.date().isoformat()}: {interaction.summary}"
+            for interaction in context.interactions
+        ],
+    )
+    _print_section("communication reminders", [reminder.text for reminder in context.reminders])
+
+
+def _print_section(title: str, items: list[str]) -> None:
+    print(f"  {title}:")
+    if not items:
+        print("    (none)")
+        return
+    for item in items:
+        print(f"    - {item}")
 
 
 def _cmd_export(ctx: CliContext, args: argparse.Namespace) -> int:

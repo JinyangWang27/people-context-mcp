@@ -12,7 +12,13 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import ToolAnnotations
 
-from people_context.app import AliasInput, AmbiguousPersonError, RememberPersonInput, SelfAlreadyExistsError
+from people_context.app import (
+    AliasInput,
+    AmbiguousPersonError,
+    RememberPersonInput,
+    ResolutionHints,
+    SelfAlreadyExistsError,
+)
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -27,7 +33,7 @@ def register(mcp: FastMCP, deps: ToolDeps) -> None:
     """Register the resolve/search/remember tools bound to the given use cases."""
 
     @mcp.tool(annotations=_READ_ONLY)
-    def resolve_person(query: str, limit: int = 5) -> dict[str, Any]:
+    def resolve_person(query: str, hints: dict[str, Any] | None = None, limit: int = 5) -> dict[str, Any]:
         """Resolve a name, nickname, or partial reference to candidate people.
 
         Call this first whenever the user mentions someone, before asking who they
@@ -37,7 +43,29 @@ def register(mcp: FastMCP, deps: ToolDeps) -> None:
         question. An empty candidate list means no confident match — use
         `remember_person` to create a new record.
         """
-        return deps.resolve_person.execute(query, limit=limit).model_dump(mode="json")
+        validated_hints = ResolutionHints.model_validate(hints) if hints is not None else None
+        return deps.resolve_person.execute(query, limit=limit, hints=validated_hints).model_dump(mode="json")
+
+    @mcp.tool(annotations=_READ_ONLY)
+    def get_person_context(
+        person_id: str,
+        purpose: str | None = None,
+        max_items: int = 10,
+        include_sensitive: bool = False,
+    ) -> dict[str, Any]:
+        """Assemble a minimal-disclosure context bundle for one person.
+
+        Returns narrow identity fields, active relationships and affiliations, and
+        one ranked facts/interactions slice capped by `max_items`. Sensitive and
+        restricted records require `include_sensitive=True`; communication traits
+        require a purpose containing `communication`.
+        """
+        return deps.get_person_context.execute(
+            person_id,
+            purpose=purpose,
+            max_items=max_items,
+            include_sensitive=include_sensitive,
+        ).model_dump(mode="json")
 
     @mcp.tool(annotations=_READ_ONLY)
     def search_people(query: str, limit: int = 10) -> dict[str, Any]:

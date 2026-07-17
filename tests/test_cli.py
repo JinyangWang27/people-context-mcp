@@ -112,7 +112,11 @@ def test_show_by_exact_id(tmp_path: Path, capsys: pytest.CaptureFixture[str]) ->
     out = capsys.readouterr().out
     assert f"Alice Wonderland ({person.id})" in out
     assert "summary: A curious person." in out
-    assert "later milestones" in out
+    assert "relationships:" in out
+    assert "affiliations:" in out
+    assert "facts:" in out
+    assert "interactions:" in out
+    assert "communication reminders:" in out
 
 
 def test_show_by_unique_name(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -125,9 +129,7 @@ def test_show_by_unique_name(tmp_path: Path, capsys: pytest.CaptureFixture[str])
     assert person.id in out
 
 
-def test_show_ambiguous_name_exits_2_and_lists_candidates(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
+def test_show_ambiguous_name_exits_2_and_lists_candidates(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     db_file = tmp_path / "people.db"
     first = _seed(db_file, "Alice Smith", aliases=[AliasInput(value="Ally")])
     second = _seed(db_file, "Alice Jones", aliases=[AliasInput(value="Ally")])

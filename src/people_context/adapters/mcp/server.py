@@ -18,8 +18,8 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from people_context.adapters.mcp.tools import register_all
-from people_context.adapters.sqlite import SqliteAuditLog, SqlitePeopleRepository, open_db
-from people_context.app import RememberPerson, ResolvePerson, SearchPeople
+from people_context.adapters.sqlite import SqliteAuditLog, SqliteContextReader, SqlitePeopleRepository, open_db
+from people_context.app import GetPersonContext, RememberPerson, ResolvePerson, SearchPeople
 from people_context.config import resolve_db_path
 from people_context.ports.clock import SystemClock
 
@@ -44,6 +44,7 @@ class ToolDeps:
     """Use-case dependencies injected into the tool layer (no globals/singletons)."""
 
     resolve_person: ResolvePerson
+    get_person_context: GetPersonContext
     search_people: SearchPeople
     remember_person: RememberPerson
 
@@ -78,11 +79,13 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
 
     conn = open_db(path)
     repository = SqlitePeopleRepository(conn)
+    context_reader = SqliteContextReader(conn)
     audit = SqliteAuditLog(conn)
     clock = SystemClock()
 
     deps = ToolDeps(
-        resolve_person=ResolvePerson(repository),
+        resolve_person=ResolvePerson(repository, context_reader, clock),
+        get_person_context=GetPersonContext(repository, context_reader, clock),
         search_people=SearchPeople(repository),
         remember_person=RememberPerson(repository, repository, audit, clock),
     )

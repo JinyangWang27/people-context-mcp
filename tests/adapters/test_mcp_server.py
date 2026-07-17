@@ -10,7 +10,8 @@ from mcp.client.session import ClientSession
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from people_context.adapters.mcp.server import build_server
-from people_context.adapters.sqlite import SqliteAuditLog, open_db
+from people_context.adapters.sqlite import SqliteAuditLog, SqlitePeopleRepository, open_db
+from people_context.domain.person import Person
 
 EXPECTED_TOOLS = {
     # real
@@ -64,6 +65,9 @@ def test_tools_list_surface_and_annotations(tmp_path: Path) -> None:
 
     assert set(by_name) >= EXPECTED_TOOLS
     assert by_name["resolve_person"].annotations.readOnlyHint is True
+    assert by_name["get_person_context"].annotations.readOnlyHint is True
+    assert "hints" in by_name["resolve_person"].inputSchema["properties"]
+    assert by_name["get_person_context"].inputSchema["properties"]["max_items"]["default"] == 10
     assert by_name["merge_people"].annotations.destructiveHint is True
     assert by_name["remember_person"].annotations.readOnlyHint is False
 
@@ -106,6 +110,44 @@ def test_stub_tool_returns_not_implemented(tmp_path: Path) -> None:
 
     payload = _run(server, call)
     assert payload == {"status": "not_implemented", "planned_milestone": "M2"}
+
+
+def test_resolve_hints_are_validated_and_real_context_payload_is_returned(tmp_path: Path) -> None:
+    db_path = tmp_path / "t.db"
+    conn = open_db(db_path)
+    repo = SqlitePeopleRepository(conn)
+    person = Person(canonical_name="Alice", summary="Colleague")
+    repo.save_person(person)
+    with conn:
+        conn.execute(
+            """
+            INSERT INTO facts (
+                id, person_id, predicate, value, recorded_at, confidence, sensitivity, provenance_source
+            ) VALUES ('fact-1', ?, 'location', 'Dubai', '2025-01-01T00:00:00+00:00', 1.0, 'public', 'test')
+            """,
+            (person.id,),
+        )
+    conn.close()
+    server = build_server(db_path=db_path)
+
+    async def flow(client: ClientSession) -> tuple[Any, dict[str, Any]]:
+        invalid = await client.call_tool("resolve_person", {"query": "Alice", "hints": {"unexpected": "x"}})
+        context = await client.call_tool("get_person_context", {"person_id": person.id})
+        return invalid, context.structuredContent
+
+    invalid_result, payload = _run(server, flow)
+
+    assert invalid_result.isError is True
+    assert payload["found"] is True
+    assert payload["identity"] == {
+        "id": person.id,
+        "canonical_name": "Alice",
+        "aliases": [],
+        "summary": "Colleague",
+        "is_self": False,
+    }
+    assert [fact["id"] for fact in payload["facts"]] == ["fact-1"]
+    assert payload["observations"] == []
 
 
 def test_build_server_logs_to_stderr_not_stdout(tmp_path: Path, capsys: Any) -> None:
