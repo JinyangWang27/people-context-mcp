@@ -1,33 +1,62 @@
 import { Type } from "typebox";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { defineToolPlugin } from "openclaw/plugin-sdk/tool-plugin";
 
 const configSchema = Type.Object({
   baseUrl: Type.Optional(
     Type.String({
-      description: "Base URL of the people-context HTTP bridge or MCP HTTP server.",
+      description: "Base URL of the people-context Streamable HTTP MCP server.",
       default: "http://127.0.0.1:8765",
+    })
+  ),
+  path: Type.Optional(
+    Type.String({
+      description: "HTTP path for the MCP endpoint.",
+      default: "/mcp",
     })
   ),
 });
 
 type Config = {
   baseUrl?: string;
+  path?: string;
 };
 
-async function post<T>(baseUrl: string, path: string, body: unknown): Promise<T> {
-  const url = new URL(path, baseUrl.replace(/\/$/, ""));
-  const response = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+function serverUrl(config: Config): URL {
+  const base = (config.baseUrl ?? "http://127.0.0.1:8765").replace(/\/$/, "");
+  const path = (config.path ?? "/mcp").replace(/^\//, "");
+  return new URL(`${base}/${path}`);
+}
+
+async function callMcpTool(
+  config: Config,
+  name: string,
+  args: Record<string, unknown>
+): Promise<unknown> {
+  const client = new Client({
+    name: "openclaw-people-context",
+    version: "0.1.0",
   });
+  const transport = new StreamableHTTPClientTransport(serverUrl(config));
+  await client.connect(transport);
 
-  if (!response.ok) {
-    const text = await response.text().catch(() => "unknown error");
-    throw new Error(`people-context request failed: ${response.status} ${text}`);
+  try {
+    const result = await client.callTool({ name, arguments: args });
+    const content = result.content as Array<{ type: string; text?: string }>;
+    const text = content
+      .filter((block) => block.type === "text")
+      .map((block) => block.text ?? "")
+      .join("");
+
+    if (!text) {
+      throw new Error("MCP tool returned no text content");
+    }
+
+    return JSON.parse(text);
+  } finally {
+    await client.close();
   }
-
-  return response.json() as Promise<T>;
 }
 
 export default defineToolPlugin({
@@ -74,11 +103,15 @@ export default defineToolPlugin({
         { query, limit, org, role, relationship },
         config: Config
       ) {
-        const baseUrl = config.baseUrl ?? "http://127.0.0.1:8765";
-        return post(baseUrl, "/resolve", {
+        const hints: Record<string, string | undefined> = {};
+        if (org !== undefined) hints.org = org;
+        if (role !== undefined) hints.role = role;
+        if (relationship !== undefined) hints.relationship = relationship;
+
+        return callMcpTool(config, "resolve_person", {
           query,
           limit: limit ?? 5,
-          hints: { org, role, relationship },
+          hints,
         });
       },
     }),
@@ -117,8 +150,7 @@ export default defineToolPlugin({
         { person_id, purpose, max_items, include_sensitive },
         config: Config
       ) {
-        const baseUrl = config.baseUrl ?? "http://127.0.0.1:8765";
-        return post(baseUrl, "/context", {
+        return callMcpTool(config, "get_person_context", {
           person_id,
           purpose: purpose ?? "communication",
           max_items: max_items ?? 10,
@@ -143,8 +175,7 @@ export default defineToolPlugin({
         ),
       }),
       async execute({ person_id, situation }, config: Config) {
-        const baseUrl = config.baseUrl ?? "http://127.0.0.1:8765";
-        return post(baseUrl, "/guidance", {
+        return callMcpTool(config, "get_communication_guidance", {
           person_id,
           situation,
         });
@@ -190,8 +221,7 @@ export default defineToolPlugin({
         { name, summary, aliases, is_self },
         config: Config
       ) {
-        const baseUrl = config.baseUrl ?? "http://127.0.0.1:8765";
-        return post(baseUrl, "/remember", {
+        return callMcpTool(config, "remember_person", {
           name,
           summary,
           aliases: aliases ?? [],

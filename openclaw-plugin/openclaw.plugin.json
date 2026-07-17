@@ -8,8 +8,13 @@
     "properties": {
       "baseUrl": {
         "type": "string",
-        "description": "Base URL of the people-context HTTP bridge or MCP HTTP server.",
+        "description": "Base URL of the people-context Streamable HTTP MCP server.",
         "default": "http://127.0.0.1:8765"
+      },
+      "path": {
+        "type": "string",
+        "description": "HTTP path for the MCP endpoint.",
+        "default": "/mcp"
       }
     }
   },

@@ -11,23 +11,17 @@ a local-first store for knowledge about the people in your life.
 - `people_communication_guidance` — get traits, friction notes, reminders, and your communication philosophy
 - `people_remember` — create or update a person record
 
-## Status
-
-This plugin speaks a small HTTP bridge protocol while the upstream
-`people-context-mcp` HTTP transport (M4) is still in development. Once M4 lands,
-the plugin can be pointed directly at the official MCP HTTP server.
-
 ## Setup
 
-### 1. Start the people-context HTTP bridge
+### 1. Start the people-context MCP HTTP server
 
 From the `people-context-mcp` checkout, run:
 
 ```bash
-uv run python openclaw-plugin/bridge.py --db people_context.db --port 8765
+uv run python -m people_context --http --db people_context.db --port 8765
 ```
 
-Or copy `bridge.py` next to your database and run it directly.
+This starts the Streamable HTTP transport on `http://127.0.0.1:8765/mcp`.
 
 ### 2. Install the plugin in OpenClaw
 
@@ -39,19 +33,20 @@ Restart the OpenClaw gateway.
 
 ### 3. Configure (optional)
 
-In your OpenClaw gateway config, set the bridge URL:
+In your OpenClaw gateway config:
 
 ```json
 {
   "plugins": {
     "people-context": {
-      "baseUrl": "http://127.0.0.1:8765"
+      "baseUrl": "http://127.0.0.1:8765",
+      "path": "/mcp"
     }
   }
 }
 ```
 
-Defaults to `http://127.0.0.1:8765`.
+Defaults to `http://127.0.0.1:8765/mcp`.
 
 ## Development
 

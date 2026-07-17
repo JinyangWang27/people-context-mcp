@@ -18,6 +18,7 @@
     "openclaw": ">=2026.5.17"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "typebox": "^1.1.38"
   },
   "devDependencies": {
