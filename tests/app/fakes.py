@@ -7,11 +7,17 @@ without the SQLite adapter.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
+from people_context.domain.fact import Fact
+from people_context.domain.interaction import Interaction
+from people_context.domain.observation import Observation
 from people_context.domain.person import Person
+from people_context.domain.reminder import Reminder, ReminderStatus
 from people_context.domain.shared import normalize_name
+from people_context.domain.trait import Trait
 from people_context.ports.audit_log import AuditEntry
+from people_context.ports.context import AffiliationRecord, RelationshipRecord
 from people_context.ports.repository import SearchHit
 
 
@@ -112,3 +118,51 @@ class FakePeopleRepository:
                 if best is None or score > best.score:
                     best = SearchHit(person=person, score=score, matched_value=value, match_kind=kind)
         return best
+
+
+class FakeContextReader:
+    """In-memory context reader with the same active-record semantics as SQLite."""
+
+    def __init__(self) -> None:
+        self.relationships: list[RelationshipRecord] = []
+        self.affiliations: list[AffiliationRecord] = []
+        self.facts: list[Fact] = []
+        self.observations: list[Observation] = []
+        self.traits: list[Trait] = []
+        self.interactions: list[Interaction] = []
+        self.reminders: list[Reminder] = []
+
+    def list_active_relationships(self, person_id: str, as_of: date) -> list[RelationshipRecord]:
+        return [
+            record
+            for record in self.relationships
+            if person_id in (record.relationship.subject_id, record.relationship.object_id)
+            and (record.relationship.period.valid_to is None or record.relationship.period.valid_to >= as_of)
+        ]
+
+    def list_active_affiliations(self, person_id: str, as_of: date) -> list[AffiliationRecord]:
+        return [
+            record
+            for record in self.affiliations
+            if record.affiliation.person_id == person_id
+            and (record.affiliation.period.valid_to is None or record.affiliation.period.valid_to >= as_of)
+        ]
+
+    def list_facts(self, person_id: str) -> list[Fact]:
+        return [record for record in self.facts if record.person_id == person_id]
+
+    def list_observations(self, person_id: str) -> list[Observation]:
+        return [record for record in self.observations if record.person_id == person_id]
+
+    def list_traits(self, person_id: str) -> list[Trait]:
+        return [record for record in self.traits if record.person_id == person_id]
+
+    def list_interactions(self, person_id: str) -> list[Interaction]:
+        return [record for record in self.interactions if person_id in record.participant_ids]
+
+    def list_active_reminders(self, person_id: str) -> list[Reminder]:
+        return [
+            record
+            for record in self.reminders
+            if record.person_id == person_id and record.status == ReminderStatus.ACTIVE
+        ]

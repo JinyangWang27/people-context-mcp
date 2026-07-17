@@ -10,7 +10,7 @@ from people_context.app.record import (
     RememberPersonResult,
     SelfAlreadyExistsError,
 )
-from people_context.app.resolve_person import ResolutionCandidate, ResolutionResult, ResolvePerson
+from people_context.app.resolve_person import ResolutionCandidate, ResolutionHints, ResolutionResult, ResolvePerson
 from people_context.app.search_people import SearchPeople
 
 __all__ = [
@@ -20,6 +20,7 @@ __all__ = [
     "RememberPersonInput",
     "RememberPersonResult",
     "ResolutionCandidate",
+    "ResolutionHints",
     "ResolutionResult",
     "ResolvePerson",
     "SearchPeople",

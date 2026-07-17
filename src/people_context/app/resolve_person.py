@@ -6,6 +6,8 @@ from pydantic import BaseModel, Field
 
 from people_context.domain.person import Person
 from people_context.domain.shared import normalize_name
+from people_context.ports.clock import Clock
+from people_context.ports.context import PersonContextReader
 from people_context.ports.repository import PersonReader
 
 _MIN_SCORE = 0.35
@@ -33,6 +35,14 @@ class ResolutionResult(BaseModel):
     ambiguous: bool
 
 
+class ResolutionHints(BaseModel):
+    """Optional organization, role, and relationship context for re-ranking."""
+
+    org: str | None = None
+    role: str | None = None
+    relationship: str | None = None
+
+
 def _candidate(person: Person, score: float, match_reason: str) -> ResolutionCandidate:
     return ResolutionCandidate(
         person_id=person.id,
@@ -47,10 +57,19 @@ def _candidate(person: Person, score: float, match_reason: str) -> ResolutionCan
 class ResolvePerson:
     """Resolve a free-text name query to ranked candidate persons."""
 
-    def __init__(self, reader: PersonReader) -> None:
+    def __init__(
+        self,
+        reader: PersonReader,
+        context_reader: PersonContextReader | None = None,
+        clock: Clock | None = None,
+    ) -> None:
         self._reader = reader
+        self._context_reader = context_reader
+        self._clock = clock
 
-    def execute(self, query: str, limit: int = 5) -> ResolutionResult:
+    def execute(
+        self, query: str, limit: int = 5, hints: ResolutionHints | None = None
+    ) -> ResolutionResult:
         """Run exact, search, and guarded fuzzy stages before ranking candidates."""
         best: dict[str, ResolutionCandidate] = {}
         normalized_query = normalize_name(query)
@@ -79,6 +98,12 @@ class ResolvePerson:
                 if distance in _FUZZY_SCORES:
                     self._offer(best, _candidate(person, _FUZZY_SCORES[distance], "fuzzy"))
 
+        if hints is not None and self._context_reader is not None and self._clock is not None:
+            best = {
+                person_id: self._boost_with_hints(candidate, hints)
+                for person_id, candidate in best.items()
+            }
+
         candidates = [c for c in best.values() if c.score >= _MIN_SCORE]
         candidates.sort(key=lambda c: (-c.score, c.canonical_name))
         candidates = candidates[:limit]
@@ -91,6 +116,32 @@ class ResolvePerson:
         existing = best.get(candidate.person_id)
         if existing is None or candidate.score > existing.score:
             best[candidate.person_id] = candidate
+
+    def _boost_with_hints(
+        self, candidate: ResolutionCandidate, hints: ResolutionHints
+    ) -> ResolutionCandidate:
+        as_of = self._clock.now().date()
+        affiliations = self._context_reader.list_active_affiliations(candidate.person_id, as_of)
+        relationships = self._context_reader.list_active_relationships(candidate.person_id, as_of)
+        matched_kinds: list[str] = []
+
+        if hints.org and any(_substring_match(hints.org, record.organization_name) for record in affiliations):
+            matched_kinds.append("org")
+        if hints.role and any(_substring_match(hints.role, record.affiliation.role) for record in affiliations):
+            matched_kinds.append("role")
+        if hints.relationship and any(
+            _substring_match(hints.relationship, value)
+            for record in relationships
+            for value in (record.relationship.type, record.relationship.label)
+            if value
+        ):
+            matched_kinds.append("relationship")
+
+        if not matched_kinds:
+            return candidate
+        score = 1.0 if candidate.score == 1.0 else min(0.99, candidate.score + 0.15 * len(matched_kinds))
+        suffix = "".join(f"+hint:{kind}" for kind in matched_kinds)
+        return candidate.model_copy(update={"score": score, "match_reason": candidate.match_reason + suffix})
 
 
 def _bounded_levenshtein(left: str, right: str, max_distance: int) -> int:
@@ -118,3 +169,11 @@ def _bounded_levenshtein(left: str, right: str, max_distance: int) -> int:
 
     distance = previous[-1]
     return distance if distance <= max_distance else max_distance + 1
+
+
+def _substring_match(hint: str, value: str) -> bool:
+    normalized_hint = normalize_name(hint)
+    normalized_value = normalize_name(value)
+    return bool(normalized_hint and normalized_value) and (
+        normalized_hint in normalized_value or normalized_value in normalized_hint
+    )

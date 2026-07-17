@@ -2,17 +2,21 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 import pytest
 
-from people_context.adapters.sqlite import SqliteAuditLog, SqlitePeopleRepository, open_db
+from people_context.adapters.sqlite import SqliteAuditLog, SqliteContextReader, SqlitePeopleRepository, open_db
 from people_context.app.record import RememberPerson, RememberPersonInput
-from people_context.app.resolve_person import ResolvePerson
+from people_context.app.resolve_person import ResolutionHints, ResolvePerson
 from people_context.app.search_people import SearchPeople
+from people_context.domain.organization import Affiliation
 from people_context.domain.person import Alias, AliasKind, Person
+from people_context.domain.relationship import Relationship
+from people_context.domain.shared import Provenance, ValidityPeriod
+from people_context.ports.context import AffiliationRecord, RelationshipRecord
 from people_context.ports.repository import SearchHit
-from tests.app.fakes import FakeClock, FakePeopleRepository
+from tests.app.fakes import FakeClock, FakeContextReader, FakePeopleRepository
 
 _TS = datetime(2024, 1, 1, tzinfo=UTC)
 
@@ -217,6 +221,180 @@ def test_weak_search_candidate_can_be_replaced_by_better_fuzzy_score() -> None:
 
     assert result.candidates[0].score == 0.45
     assert result.candidates[0].match_reason == "fuzzy"
+
+
+def test_hints_boost_existing_candidates_in_deterministic_order_and_cap_score() -> None:
+    repo = FakePeopleRepository()
+    context = FakeContextReader()
+    person = _person("Alice Smith")
+    other = _person("Bob Jones")
+    repo.save_person(person)
+    repo.forced_hits["Alice"] = [
+        SearchHit(person=person, score=1.0, matched_value=person.canonical_name, match_kind="canonical")
+    ]
+    context.affiliations.append(
+        AffiliationRecord(
+            affiliation=Affiliation(
+                person_id=person.id,
+                org_id="org-1",
+                role="Senior Engineer",
+                provenance=Provenance(source="test"),
+            ),
+            organization_name="Acme Corporation",
+        )
+    )
+    context.relationships.append(
+        RelationshipRecord(
+            relationship=Relationship(
+                subject_id=other.id,
+                object_id=person.id,
+                type="manager_of",
+                label="Direct manager",
+                provenance=Provenance(source="test"),
+            ),
+            other_person_id=other.id,
+            other_person_name=other.canonical_name,
+        )
+    )
+
+    result = ResolvePerson(repo, context, FakeClock()).execute(
+        "Alice",
+        hints=ResolutionHints(org="Acme", role="senior engineer on platform", relationship="manager"),
+    )
+
+    assert result.candidates[0].score == 0.99
+    assert result.candidates[0].match_reason == "search:canonical+hint:org+hint:role+hint:relationship"
+
+
+def test_hints_do_not_add_candidates_and_exact_score_remains_one() -> None:
+    repo = FakePeopleRepository()
+    context = FakeContextReader()
+    person = _person("Alice")
+    repo.save_person(person)
+    context.affiliations.append(
+        AffiliationRecord(
+            affiliation=Affiliation(
+                person_id=person.id,
+                org_id="org-1",
+                role="Engineer",
+                provenance=Provenance(source="test"),
+            ),
+            organization_name="Acme",
+        )
+    )
+
+    exact = ResolvePerson(repo, context, FakeClock()).execute("Alice", hints=ResolutionHints(org="Acme"))
+    missing = ResolvePerson(repo, context, FakeClock()).execute("Nobody", hints=ResolutionHints(org="Acme"))
+
+    assert exact.candidates[0].score == 1.0
+    assert exact.candidates[0].match_reason == "exact+hint:org"
+    assert missing.candidates == []
+
+
+def test_expired_hint_context_is_ignored_but_future_context_is_active() -> None:
+    repo = FakePeopleRepository()
+    context = FakeContextReader()
+    person = _person("Alice Smith")
+    repo.save_person(person)
+    repo.forced_hits["Alice"] = [
+        SearchHit(person=person, score=0.5, matched_value=person.canonical_name, match_kind="canonical")
+    ]
+    provenance = Provenance(source="test")
+    context.affiliations.extend(
+        [
+            AffiliationRecord(
+                affiliation=Affiliation(
+                    person_id=person.id,
+                    org_id="expired",
+                    role="Old Role",
+                    period=ValidityPeriod(valid_to=date(2024, 12, 31)),
+                    provenance=provenance,
+                ),
+                organization_name="Expired Corp",
+            ),
+            AffiliationRecord(
+                affiliation=Affiliation(
+                    person_id=person.id,
+                    org_id="future",
+                    role="Future Role",
+                    period=ValidityPeriod(valid_from=date(2026, 1, 1)),
+                    provenance=provenance,
+                ),
+                organization_name="Future Corp",
+            ),
+        ]
+    )
+    resolver = ResolvePerson(repo, context, FakeClock(datetime(2025, 1, 1, tzinfo=UTC)))
+
+    expired = resolver.execute("Alice", hints=ResolutionHints(org="Expired"))
+    future = resolver.execute("Alice", hints=ResolutionHints(org="Future"))
+
+    assert expired.candidates[0].match_reason == "search:canonical"
+    assert future.candidates[0].match_reason == "search:canonical+hint:org"
+
+
+@pytest.mark.parametrize(
+    ("hints", "reason"),
+    [
+        (ResolutionHints(org="Acme"), "+hint:org"),
+        (ResolutionHints(role="Platform Engineer"), "+hint:role"),
+        (ResolutionHints(relationship="direct manager"), "+hint:relationship"),
+    ],
+)
+def test_sqlite_context_hints_disambiguate_duplicate_names(hints: ResolutionHints, reason: str) -> None:
+    conn = open_db(":memory:")
+    repo = SqlitePeopleRepository(conn)
+    target = _person("Alex Lee")
+    other = _person("Alex Liu")
+    manager = _person("Morgan")
+    for person in (target, other, manager):
+        repo.save_person(person)
+
+    with conn:
+        conn.execute("INSERT INTO organizations (id, name, kind) VALUES ('org-active', 'Acme Corp', 'company')")
+        conn.execute("INSERT INTO organizations (id, name, kind) VALUES ('org-old', 'Old Corp', 'company')")
+        affiliation_values = (
+            target.id,
+            "2026-01-01",
+            _TS.isoformat(),
+        )
+        conn.execute(
+            """
+            INSERT INTO affiliations (
+                id, person_id, org_id, role, valid_from, valid_to, confidence,
+                provenance_source, created_at
+            ) VALUES ('aff-active', ?, 'org-active', 'Platform Engineer', ?, NULL, 1.0, 'test', ?)
+            """,
+            affiliation_values,
+        )
+        conn.execute(
+            """
+            INSERT INTO affiliations (
+                id, person_id, org_id, role, valid_from, valid_to, confidence,
+                provenance_source, created_at
+            ) VALUES ('aff-old', ?, 'org-old', 'Former Engineer', NULL, '2024-12-31', 1.0, 'test', ?)
+            """,
+            (other.id, _TS.isoformat()),
+        )
+        conn.execute(
+            """
+            INSERT INTO relationships (
+                id, subject_id, object_id, type, label, valid_from, valid_to,
+                confidence, provenance_source, created_at
+            ) VALUES ('rel-active', ?, ?, 'manager_of', 'Direct Manager', NULL, NULL, 1.0, 'test', ?)
+            """,
+            (manager.id, target.id, _TS.isoformat()),
+        )
+
+    result = ResolvePerson(
+        repo,
+        SqliteContextReader(conn),
+        FakeClock(datetime(2025, 1, 1, tzinfo=UTC)),
+    ).execute("Alex", hints=hints)
+
+    assert result.candidates[0].person_id == target.id
+    assert result.candidates[0].match_reason.endswith(reason)
+    assert result.ambiguous is True
 
 
 def test_search_people_returns_ranked_candidates_with_search_reasons() -> None:
