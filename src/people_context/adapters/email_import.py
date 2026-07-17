@@ -89,13 +89,21 @@ class EmailImportExtractor:
             if (content is None) == (path is None):
                 raise ImportExtractionError("invalid_source", "email import requires exactly one of content or path")
             raw = content.encode("utf-8") if content is not None else Path(path or "").read_bytes()
-            return [parser.parsebytes(raw, headersonly=True)]
+            return [parser.parsebytes(_header_bytes(raw), headersonly=True)]
         if source_type == "mbox":
             if path is None or content is not None:
                 raise ImportExtractionError("invalid_source", "mbox import requires path and does not accept content")
 
-            def header_factory(file_obj):
-                return parser.parse(file_obj, headersonly=True)
+            def header_factory(file_obj) -> mailbox.mboxMessage:
+                lines: list[bytes] = []
+                while True:
+                    line = file_obj.readline()
+                    if not line:
+                        break
+                    lines.append(line)
+                    if line in (b"\n", b"\r\n"):
+                        break
+                return mailbox.mboxMessage(parser.parsebytes(b"".join(lines), headersonly=True))
 
             mbox = mailbox.mbox(path, factory=header_factory, create=False)
             try:
@@ -141,3 +149,12 @@ def _clean_header(value: object | None) -> str | None:
 
 def _normalize_text(value: str) -> str:
     return " ".join(value.split())
+
+
+def _header_bytes(raw: bytes) -> bytes:
+    """Return only the RFC header block, including its terminating blank line."""
+    for separator in (b"\r\n\r\n", b"\n\n"):
+        header, found, _ = raw.partition(separator)
+        if found:
+            return header + separator
+    return raw

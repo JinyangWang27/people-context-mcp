@@ -36,7 +36,8 @@ class CompleteReminder:
         writer: RecordWriter,
         audit: AuditLog,
         clock: Clock,
-        people: PersonReader | None = None,
+        *,
+        people: PersonReader,
     ) -> None:
         self._records = records
         self._writer = writer
@@ -49,8 +50,7 @@ class CompleteReminder:
         current = self._records.get_record("reminder", data.reminder_id)
         if not isinstance(current, Reminder):
             raise RecordNotFoundError("reminder", data.reminder_id)
-        if self._people is not None:
-            require_active_person(self._people, current.person_id)
+        require_active_person(self._people, current.person_id)
         if current.status != ReminderStatus.ACTIVE:
             raise ReminderNotActiveError(current.id, current.status.value)
         before = snapshot(current)

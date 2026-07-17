@@ -225,3 +225,20 @@ def test_forget_rolls_back_deletion_and_redaction_on_failure() -> None:
 
     assert people.get(person.id) is not None
     assert conn.execute("SELECT payload_json FROM audit_log").fetchone()[0] == '{"name": "Alice"}'
+
+
+def test_forget_accepts_soft_deleted_person_and_removes_fts_rows() -> None:
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    person = _person("Alice")
+    people.save_person(person)
+    person.deleted_at = _NOW
+    people.save_person(person)
+    # Simulate a stale out-of-band FTS row to prove hard deletion cleans derived state.
+    with conn:
+        conn.execute("INSERT INTO person_search (name, person_id) VALUES ('stale', ?)", (person.id,))
+
+    result = Forget(people, SqliteLifecycleStore(conn), _Clock()).execute(person.id, "person")
+
+    assert result.deleted["persons"] == 1
+    assert conn.execute("SELECT COUNT(*) FROM person_search WHERE person_id = ?", (person.id,)).fetchone()[0] == 0

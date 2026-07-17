@@ -57,7 +57,8 @@ class CorrectRecord:
         writer: RecordWriter,
         audit: AuditLog,
         clock: Clock,
-        people: PersonReader | None = None,
+        *,
+        people: PersonReader,
     ) -> None:
         self._records = records
         self._writer = writer
@@ -74,9 +75,8 @@ class CorrectRecord:
         current = self._records.get_record(data.entity_type, data.entity_id)
         if current is None:
             raise RecordNotFoundError(data.entity_type, data.entity_id)
-        if self._people is not None:
-            for person_id in _linked_person_ids(current):
-                require_active_person(self._people, person_id)
+        for person_id in _linked_person_ids(current):
+            require_active_person(self._people, person_id)
         try:
             validated_fields = _validate_fields(current, data.fields)
         except (ValidationError, ValueError, TypeError):

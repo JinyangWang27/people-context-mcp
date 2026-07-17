@@ -254,6 +254,26 @@ def test_reminder_transitions_and_kind_validation(write_deps: tuple) -> None:
         )
 
 
+def test_record_correction_and_reminder_completion_reject_deleted_owner(write_deps: tuple) -> None:
+    people, records, audit, clock, _, other = write_deps
+    fact = RecordFact(people, records, audit, clock).execute(
+        RecordFactInput(person_id=other.id, predicate="location", value="Dubai")
+    )
+    reminder = SetReminder(people, records, audit, clock).execute(
+        SetReminderInput(person_id=other.id, text="Follow up", kind=ReminderKind.FOLLOW_UP, due_at=_NOW)
+    )
+    other.deleted_at = _NOW
+
+    with pytest.raises(PersonNotFoundError):
+        CorrectRecord(records, records, audit, clock, people=people).execute(
+            CorrectRecordInput(entity_type="fact", entity_id=fact.id, fields={"value": "Abu Dhabi"})
+        )
+    with pytest.raises(PersonNotFoundError):
+        CompleteReminder(records, records, audit, clock, people=people).execute(
+            CompleteReminderInput(reminder_id=reminder.id)
+        )
+
+
 def test_philosophy_round_trip_and_audit_contains_lengths_only(write_deps: tuple) -> None:
     _, _, audit, clock, _, _ = write_deps
     preferences = FakePreferencesStore()

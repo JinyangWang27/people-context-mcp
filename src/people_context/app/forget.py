@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from people_context.app.write_support import RecordNotFoundError, require_active_person
+from people_context.app.write_support import PersonNotFoundError, RecordNotFoundError, require_active_person
 from people_context.ports.audit_log import AuditEntry
 from people_context.ports.clock import Clock
 from people_context.ports.lifecycle import LifecycleStore, LifecycleTargetNotFoundError
@@ -39,9 +39,10 @@ class Forget:
         self._clock = clock
 
     def execute(self, target: str, scope: str) -> ForgetResult:
-        """Forget one active person or one validated record target atomically."""
+        """Forget one stored person or one validated record target atomically."""
         if scope == "person":
-            require_active_person(self._people, target)
+            if self._people.get(target) is None:
+                raise PersonNotFoundError(target)
             deleted = self._lifecycle.forget_person(target, self._audit_factory(scope, target))
             return ForgetResult(scope=scope, target=target, deleted=deleted)
         if scope != "record":

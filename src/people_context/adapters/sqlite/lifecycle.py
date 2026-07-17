@@ -68,6 +68,7 @@ class SqliteLifecycleStore:
                 ).fetchall()
             ]
             self._redact_audits(person_id, person_id)
+            self._conn.execute("DELETE FROM person_search WHERE person_id = ?", (person_id,))
             self._conn.execute("DELETE FROM persons WHERE id = ?", (person_id,))
             if orphan_ids:
                 placeholders = ", ".join("?" for _ in orphan_ids)
