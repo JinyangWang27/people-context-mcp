@@ -34,8 +34,3 @@ def register(mcp: FastMCP) -> None:
     def commit_import(batch_id: str, accepted_ids: list[str]) -> dict[str, Any]:
         """Write accepted staged candidates with import provenance."""
         return _pending("M3")
-
-    @mcp.tool(annotations=_WRITE)
-    def export_data() -> dict[str, Any]:
-        """Export the full dataset as a maximal-disclosure JSON document."""
-        return _pending("M3")

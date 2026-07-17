@@ -13,11 +13,11 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from people_context.adapters.sqlite import SqliteContextReader, SqlitePeopleRepository, open_db
-from people_context.app import GetPersonContext, PersonContextResult, ResolvePerson, SearchPeople
+from people_context.adapters.sqlite import SqliteContextReader, SqliteExportReader, SqlitePeopleRepository, open_db
+from people_context.app import ExportData, GetPersonContext, PersonContextResult, ResolvePerson, SearchPeople
 from people_context.config import describe_resolution, resolve_db_path
 from people_context.domain.person import Person
-from people_context.ports.clock import SystemClock
+from people_context.ports.clock import Clock, SystemClock
 
 _SUMMARY_WIDTH = 40
 
@@ -29,7 +29,8 @@ class CliContext:
     conn: sqlite3.Connection
     repo: SqlitePeopleRepository
     context_reader: SqliteContextReader
-    clock: SystemClock
+    clock: Clock
+    export_reader: SqliteExportReader
 
 
 def _open_context(db: str | None) -> CliContext:
@@ -39,6 +40,7 @@ def _open_context(db: str | None) -> CliContext:
         repo=SqlitePeopleRepository(conn),
         context_reader=SqliteContextReader(conn),
         clock=SystemClock(),
+        export_reader=SqliteExportReader(conn),
     )
 
 
@@ -218,14 +220,8 @@ def _print_section(title: str, items: list[str]) -> None:
 
 
 def _cmd_export(ctx: CliContext, args: argparse.Namespace) -> int:
-    people = ctx.repo.list_people(include_deleted=True)
-    document = {
-        "format": "people-context-export",
-        "version": 1,
-        "exported_at": SystemClock().now().isoformat(),
-        "people": [person.model_dump(mode="json") for person in people],
-    }
-    text = json.dumps(document, indent=2)
+    document = ExportData(ctx.export_reader, ctx.clock).execute().model_dump(mode="json")
+    text = json.dumps(document, indent=2, ensure_ascii=False)
     if args.output:
         Path(args.output).write_text(text + "\n", encoding="utf-8")
     else:

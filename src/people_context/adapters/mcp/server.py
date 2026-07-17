@@ -21,6 +21,7 @@ from people_context.adapters.mcp.tools import register_all
 from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqliteContextReader,
+    SqliteExportReader,
     SqliteLifecycleStore,
     SqliteOrganizationStore,
     SqlitePeopleRepository,
@@ -32,6 +33,7 @@ from people_context.app import (
     AddAlias,
     CompleteReminder,
     CorrectRecord,
+    ExportData,
     Forget,
     GetCommunicationGuidance,
     GetPersonContext,
@@ -92,6 +94,7 @@ class ToolDeps:
     list_reminders: ListReminders
     merge_people: MergePeople
     forget: Forget
+    export_data: ExportData
 
 
 def _configure_logging() -> logging.Logger:
@@ -130,6 +133,7 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
     preferences_store = SqlitePreferencesStore(conn)
     audit = SqliteAuditLog(conn)
     lifecycle_store = SqliteLifecycleStore(conn)
+    export_reader = SqliteExportReader(conn)
     clock = SystemClock()
 
     deps = ToolDeps(
@@ -154,6 +158,7 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
         list_reminders=ListReminders(record_store),
         merge_people=MergePeople(repository, lifecycle_store, clock),
         forget=Forget(repository, lifecycle_store, clock),
+        export_data=ExportData(export_reader, clock),
     )
 
     mcp = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from people_context.adapters.mcp.tools import lifecycle, m2, people, stubs
+from people_context.adapters.mcp.tools import lifecycle, m2, people, portability, stubs
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -19,4 +19,5 @@ def register_all(mcp: FastMCP, deps: ToolDeps) -> None:
     people.register(mcp, deps)
     m2.register(mcp, deps)
     lifecycle.register(mcp, deps)
+    portability.register(mcp, deps)
     stubs.register(mcp)

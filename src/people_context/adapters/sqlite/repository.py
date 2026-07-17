@@ -196,7 +196,7 @@ class SqlitePeopleRepository:
 
     def _hydrate(self, row: sqlite3.Row) -> Person:
         alias_rows = self._conn.execute(
-            "SELECT id, value, kind, lang, script FROM aliases WHERE person_id = ?",
+            "SELECT id, value, kind, lang, script FROM aliases WHERE person_id = ? ORDER BY id",
             (row["id"],),
         ).fetchall()
         aliases = [
