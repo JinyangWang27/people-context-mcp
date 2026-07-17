@@ -48,6 +48,7 @@ from people_context.adapters.sqlite import (
 from people_context.adapters.vcard_import import ImportExtractorRouter
 from people_context.app import (
     AddAlias,
+    CandidateStager,
     CommitImport,
     CompleteReminder,
     CorrectRecord,
@@ -71,6 +72,7 @@ from people_context.app import (
     SetCommunicationPhilosophy,
     SetRelationship,
     SetReminder,
+    StageCandidates,
 )
 from people_context.config import resolve_db_path
 from people_context.ports.clock import SystemClock
@@ -120,6 +122,7 @@ class ToolDeps:
     import_content: ImportContent
     review_import: ReviewImport
     commit_import: CommitImport
+    stage_candidates: StageCandidates
 
 
 def _configure_logging() -> logging.Logger:
@@ -176,6 +179,7 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
         lifecycle_store = IndexingLifecycleStore(lifecycle_store, semantic_updater, warn)
     remember_person = RememberPerson(repository, repository, audit, clock)
     record_interaction = RecordInteraction(repository, record_store, audit, clock)
+    candidate_stager = CandidateStager(repository, import_staging, clock)
 
     deps = ToolDeps(
         resolve_person=ResolvePerson(repository, context_reader, clock),
@@ -208,7 +212,13 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
         merge_people=MergePeople(repository, lifecycle_store, clock),
         forget=Forget(repository, lifecycle_store, clock),
         export_data=ExportData(export_reader, clock),
-        import_content=ImportContent(repository, ImportExtractorRouter(), import_staging, clock),
+        import_content=ImportContent(
+            repository,
+            ImportExtractorRouter(),
+            import_staging,
+            clock,
+            candidate_stager,
+        ),
         review_import=ReviewImport(import_staging),
         commit_import=CommitImport(
             repository,
@@ -218,6 +228,7 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
             SetAffiliation(repository, organization_store, record_store, audit, clock),
             RecordFact(repository, record_store, audit, clock),
         ),
+        stage_candidates=StageCandidates(candidate_stager),
     )
 
     mcp = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)

@@ -17,14 +17,21 @@ from people_context.app.get_person_context import (
     PersonRelationshipContext,
 )
 from people_context.app.import_content import (
+    AffiliationCandidateInput,
+    CandidateAlias,
+    CandidateStager,
     CommitImport,
     CommitImportResult,
+    FactCandidateInput,
     ImportBatchResult,
     ImportContent,
     ImportPipelineError,
     ImportReviewResult,
     ImportReviewRow,
+    InteractionCandidateInput,
+    PersonCandidateInput,
     ReviewImport,
+    StageCandidates,
 )
 from people_context.app.list_reminders import ListReminders, ListRemindersInput
 from people_context.app.merge_people import MergeMovedCounts, MergePeople, MergePeopleError, MergePeopleResult
@@ -69,10 +76,13 @@ from people_context.app.write_support import (
 )
 
 __all__ = [
+    "AffiliationCandidateInput",
     "AliasInput",
     "AddAlias",
     "AddAliasInput",
     "AmbiguousPersonError",
+    "CandidateAlias",
+    "CandidateStager",
     "GetPersonContext",
     "CommunicationGuidanceResult",
     "GetCommunicationGuidance",
@@ -85,6 +95,7 @@ __all__ = [
     "ImportPipelineError",
     "ImportReviewResult",
     "ImportReviewRow",
+    "InteractionCandidateInput",
     "ListReminders",
     "ListRemindersInput",
     "MergeMovedCounts",
@@ -111,6 +122,7 @@ __all__ = [
     "PreviewForget",
     "PersonNotFoundError",
     "PersonNameCollisionError",
+    "PersonCandidateInput",
     "RecordFact",
     "RecordFactInput",
     "RecordInteraction",
@@ -131,6 +143,7 @@ __all__ = [
     "ResolutionHints",
     "ResolutionResult",
     "ReviewImport",
+    "StageCandidates",
     "ResolvePerson",
     "SearchPeople",
     "SemanticSearch",
@@ -149,4 +162,5 @@ __all__ = [
     "SetReminderInput",
     "SelfAlreadyExistsError",
     "ReminderNotActiveError",
+    "FactCandidateInput",
 ]

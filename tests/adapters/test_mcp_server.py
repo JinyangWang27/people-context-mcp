@@ -40,6 +40,7 @@ EXPECTED_TOOLS = {
     "complete_reminder",
     "set_communication_philosophy",
     "import_content",
+    "stage_candidates",
     "review_import",
     "commit_import",
     # destructive stubs
@@ -71,6 +72,8 @@ def test_tools_list_surface_and_annotations(tmp_path: Path) -> None:
     assert set(by_name) >= EXPECTED_TOOLS
     assert by_name["resolve_person"].annotations.readOnlyHint is True
     assert by_name["semantic_search"].annotations.readOnlyHint is True
+    assert by_name["stage_candidates"].annotations.readOnlyHint is False
+    assert by_name["stage_candidates"].annotations.destructiveHint is False
     assert by_name["get_person_context"].annotations.readOnlyHint is True
     assert by_name["get_communication_guidance"].annotations.readOnlyHint is True
     assert by_name["list_reminders"].annotations.readOnlyHint is True
@@ -294,6 +297,42 @@ def test_all_invalid_vcards_return_no_candidates_with_skip_details(tmp_path: Pat
 
     assert payload["error"] == "no_candidates"
     assert payload["skipped_cards"] == [{"index": 1, "reason": "missing_fn"}]
+
+
+def test_stage_candidates_returns_strict_validation_details(tmp_path: Path) -> None:
+    server = build_server(db_path=tmp_path / "agent-stage.db")
+
+    async def flow(client: ClientSession) -> Any:
+        return await client.call_tool(
+            "stage_candidates",
+            {
+                "source": "notes",
+                "candidates": [
+                    {
+                        "type": "person",
+                        "ref": "alice",
+                        "name": "Alice",
+                        "aliases": [],
+                        "unexpected": "forbidden",
+                    }
+                ],
+            },
+        )
+
+    payload = _run(server, flow).structuredContent
+
+    assert payload["error"] == "invalid_candidates"
+    assert payload["details"][0]["type"] == "extra_forbidden"
+    assert payload["allowed_types"] == ["person", "interaction", "affiliation", "fact"]
+    assert payload["valid_fields"]["person"] == [
+        "type",
+        "ref",
+        "name",
+        "aliases",
+        "summary",
+        "message_id",
+        "date",
+    ]
 
 
 def test_merge_people_tool_is_real_and_returns_structured_errors(tmp_path: Path) -> None:
