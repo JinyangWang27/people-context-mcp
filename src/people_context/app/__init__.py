@@ -15,6 +15,16 @@ from people_context.app.get_person_context import (
     PersonIdentity,
     PersonRelationshipContext,
 )
+from people_context.app.import_content import (
+    CommitImport,
+    CommitImportResult,
+    ImportBatchResult,
+    ImportContent,
+    ImportPipelineError,
+    ImportReviewResult,
+    ImportReviewRow,
+    ReviewImport,
+)
 from people_context.app.list_reminders import ListReminders, ListRemindersInput
 from people_context.app.merge_people import MergeMovedCounts, MergePeople, MergePeopleError, MergePeopleResult
 from people_context.app.record import (
@@ -59,6 +69,11 @@ __all__ = [
     "ForgetError",
     "ForgetPreview",
     "ForgetResult",
+    "ImportBatchResult",
+    "ImportContent",
+    "ImportPipelineError",
+    "ImportReviewResult",
+    "ImportReviewRow",
     "ListReminders",
     "ListRemindersInput",
     "MergeMovedCounts",
@@ -67,6 +82,8 @@ __all__ = [
     "MergePeopleResult",
     "CompleteReminder",
     "CompleteReminderInput",
+    "CommitImport",
+    "CommitImportResult",
     "CorrectRecord",
     "CorrectRecordInput",
     "ExportData",
@@ -95,6 +112,7 @@ __all__ = [
     "ResolutionCandidate",
     "ResolutionHints",
     "ResolutionResult",
+    "ReviewImport",
     "ResolvePerson",
     "SearchPeople",
     "SetAffiliation",

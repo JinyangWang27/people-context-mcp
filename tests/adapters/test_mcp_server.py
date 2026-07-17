@@ -105,7 +105,7 @@ def test_remember_then_resolve_and_audit_row(tmp_path: Path) -> None:
     assert any(entry.entity_id == person_id and entry.op == "create" for entry in entries)
 
 
-def test_m3_stub_remains_not_implemented(tmp_path: Path) -> None:
+def test_import_content_returns_structured_error_for_empty_email(tmp_path: Path) -> None:
     server = build_server(db_path=tmp_path / "t.db")
 
     async def call(client: ClientSession) -> dict[str, Any]:
@@ -113,7 +113,7 @@ def test_m3_stub_remains_not_implemented(tmp_path: Path) -> None:
         return result.structuredContent
 
     payload = _run(server, call)
-    assert payload == {"status": "not_implemented", "planned_milestone": "M3"}
+    assert payload["error"] == "no_candidates"
 
 
 def test_merge_people_tool_is_real_and_returns_structured_errors(tmp_path: Path) -> None:
