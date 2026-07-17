@@ -10,6 +10,8 @@ from people_context.app.write_support import (
     audit_mutation,
     require_active_person,
     snapshot,
+    transactional,
+    unit_of_work_for,
 )
 from people_context.domain.reminder import Reminder, ReminderStatus
 from people_context.ports.audit_log import AuditLog
@@ -43,8 +45,10 @@ class CompleteReminder:
         self._writer = writer
         self._audit = audit
         self._clock = clock
+        self._uow = unit_of_work_for(audit)
         self._people = people
 
+    @transactional
     def execute(self, data: CompleteReminderInput) -> Reminder:
         """Complete one reminder, rejecting repeated completion."""
         current = self._records.get_record("reminder", data.reminder_id)

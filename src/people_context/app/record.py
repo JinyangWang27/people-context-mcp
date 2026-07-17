@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+from people_context.app.write_support import transactional, unit_of_work_for
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.domain.shared import normalize_name
 from people_context.ports.audit_log import AuditEntry, AuditLog
@@ -64,7 +65,9 @@ class RememberPerson:
         self._writer = writer
         self._audit = audit
         self._clock = clock
+        self._uow = unit_of_work_for(audit)
 
+    @transactional
     def execute(self, data: RememberPersonInput) -> RememberPersonResult:
         """Upsert a person by normalized name, recording an audit entry."""
         normalized = normalize_name(data.name)

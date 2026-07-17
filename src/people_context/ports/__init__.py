@@ -21,6 +21,7 @@ from people_context.ports.semantic import (
     VectorIndex,
     VectorSearchHit,
 )
+from people_context.ports.unit_of_work import NullUnitOfWork, UnitOfWork
 
 __all__ = [
     "AuditEntry",
@@ -31,6 +32,7 @@ __all__ = [
     "ExportSnapshot",
     "EmbeddingProvider",
     "LifecycleStore",
+    "NullUnitOfWork",
     "PersonReader",
     "PersonSearchIndexer",
     "PersonContextReader",
@@ -50,6 +52,7 @@ __all__ = [
     "SemanticIndexRebuilder",
     "RelationshipRecord",
     "SystemClock",
+    "UnitOfWork",
     "VectorIndex",
     "VectorSearchHit",
 ]

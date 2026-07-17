@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from people_context.app.write_support import require_active_person
+from people_context.app.write_support import require_active_person, transactional, unit_of_work_for
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.domain.shared import normalize_name
 from people_context.ports.audit_log import AuditEntry
@@ -48,7 +48,9 @@ class MergePeople:
         self._people = people
         self._lifecycle = lifecycle
         self._clock = clock
+        self._uow = unit_of_work_for(lifecycle)
 
+    @transactional
     def execute(self, primary_id: str, duplicate_id: str) -> MergePeopleResult:
         """Merge aliases, summary, and all linked records in one store transaction."""
         if primary_id == duplicate_id:

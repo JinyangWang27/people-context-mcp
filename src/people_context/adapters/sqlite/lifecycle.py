@@ -6,6 +6,7 @@ import json
 import sqlite3
 from collections.abc import Callable
 
+from people_context.adapters.sqlite.unit_of_work import SqliteUnitOfWork
 from people_context.domain.person import Person
 from people_context.domain.shared import normalize_name
 from people_context.ports.audit_log import AuditEntry
@@ -19,6 +20,11 @@ class SqliteLifecycleStore:
         self._conn = conn
         self._failure_hook = failure_hook
 
+    @property
+    def unit_of_work(self) -> SqliteUnitOfWork:
+        """Return a join-safe transaction boundary for application orchestration."""
+        return SqliteUnitOfWork(self._conn)
+
     def merge_people(
         self,
         primary: Person,
@@ -26,7 +32,7 @@ class SqliteLifecycleStore:
         audit_factory: Callable[[dict[str, int]], AuditEntry],
     ) -> dict[str, int]:
         """Re-parent duplicate-linked rows and append one audit atomically."""
-        with self._conn:
+        with SqliteUnitOfWork(self._conn):
             self._save_primary(primary, duplicate_id)
             counts = {
                 "facts": self._reparent("facts", duplicate_id, primary.id),
@@ -54,7 +60,7 @@ class SqliteLifecycleStore:
         audit_factory: Callable[[dict[str, int]], AuditEntry],
     ) -> dict[str, int]:
         """Hard-delete a person graph, redact prior audits, and add one tombstone."""
-        with self._conn:
+        with SqliteUnitOfWork(self._conn):
             counts = self.preview_person_forget(person_id)
             orphan_ids = [
                 row["interaction_id"]
@@ -98,7 +104,7 @@ class SqliteLifecycleStore:
             "reminder": "reminders",
         }
         table = tables[entity_type]
-        with self._conn:
+        with SqliteUnitOfWork(self._conn):
             row = self._conn.execute(
                 f"SELECT id FROM {table} WHERE id = ?",  # noqa: S608 - internal table map
                 (entity_id,),

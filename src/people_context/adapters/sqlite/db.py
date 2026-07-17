@@ -54,7 +54,9 @@ def _run_migrations(conn: sqlite3.Connection) -> None:
     for version, sql in _discover_migrations():
         if version <= current:
             continue
-        with conn:
-            conn.executescript(sql)
-            # PRAGMA does not accept parameter binding; version is a trusted int.
-            conn.execute(f"PRAGMA user_version = {version}")
+        try:
+            conn.executescript(f"BEGIN;\n{sql}\nPRAGMA user_version = {version};\nCOMMIT;")
+        except Exception:
+            if conn.in_transaction:
+                conn.rollback()
+            raise

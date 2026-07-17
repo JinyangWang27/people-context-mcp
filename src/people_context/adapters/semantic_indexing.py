@@ -187,6 +187,11 @@ class IndexingLifecycleStore:
     def preview_person_forget(self, person_id: str) -> dict[str, int]:
         return self._delegate.preview_person_forget(person_id)
 
+    @property
+    def unit_of_work(self):
+        """Forward an adapter-provided transaction boundary when present."""
+        return getattr(self._delegate, "unit_of_work", None)
+
     def _best_effort(self, operation: Callable[[], None]) -> None:
         try:
             operation()

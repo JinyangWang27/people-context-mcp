@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from pydantic import BaseModel
 
-from people_context.app.write_support import PersonNotFoundError, RecordNotFoundError, require_active_person
+from people_context.app.write_support import (
+    PersonNotFoundError,
+    RecordNotFoundError,
+    require_active_person,
+    transactional,
+    unit_of_work_for,
+)
 from people_context.ports.audit_log import AuditEntry
 from people_context.ports.clock import Clock
 from people_context.ports.lifecycle import LifecycleStore, LifecycleTargetNotFoundError
@@ -37,7 +43,9 @@ class Forget:
         self._people = people
         self._lifecycle = lifecycle
         self._clock = clock
+        self._uow = unit_of_work_for(lifecycle)
 
+    @transactional
     def execute(self, target: str, scope: str) -> ForgetResult:
         """Forget one stored person or one validated record target atomically."""
         if scope == "person":

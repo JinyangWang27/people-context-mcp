@@ -13,6 +13,8 @@ from people_context.app.write_support import (
     provenance,
     require_active_person,
     snapshot,
+    transactional,
+    unit_of_work_for,
 )
 from people_context.domain.organization import Affiliation, Organization
 from people_context.domain.shared import Confidence, ValidityPeriod, normalize_name
@@ -54,7 +56,9 @@ class SetAffiliation:
         self._writer = writer
         self._audit = audit
         self._clock = clock
+        self._uow = unit_of_work_for(audit)
 
+    @transactional
     def execute(self, data: SetAffiliationInput) -> Affiliation:
         """Create and audit an affiliation, auditing organization creation separately."""
         require_active_person(self._people, data.person_id)
@@ -67,8 +71,13 @@ class SetAffiliation:
             organization = Organization(name=data.org)
             self._organizations.save(organization)
             audit_mutation(
-                self._audit, self._clock, op="create", entity_type="organization", entity_id=organization.id,
-                payload=snapshot(organization), source=data.source,
+                self._audit,
+                self._clock,
+                op="create",
+                entity_type="organization",
+                entity_id=organization.id,
+                payload=snapshot(organization),
+                source=data.source,
             )
         affiliation = Affiliation(
             person_id=data.person_id,
@@ -81,7 +90,12 @@ class SetAffiliation:
         )
         self._writer.save_affiliation(affiliation)
         audit_mutation(
-            self._audit, self._clock, op="create", entity_type="affiliation", entity_id=affiliation.id,
-            payload=snapshot(affiliation), source=data.source,
+            self._audit,
+            self._clock,
+            op="create",
+            entity_type="affiliation",
+            entity_id=affiliation.id,
+            payload=snapshot(affiliation),
+            source=data.source,
         )
         return affiliation

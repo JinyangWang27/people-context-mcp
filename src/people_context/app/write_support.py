@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+from collections.abc import Callable
+from functools import wraps
+from typing import Any, ParamSpec, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -10,6 +12,32 @@ from people_context.domain.shared import Provenance
 from people_context.ports.audit_log import AuditEntry, AuditLog
 from people_context.ports.clock import Clock
 from people_context.ports.repository import PersonReader
+from people_context.ports.unit_of_work import NullUnitOfWork, UnitOfWork
+
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def transactional(method: Callable[_P, _R]) -> Callable[_P, _R]:
+    """Run a write-use-case method inside its configured unit of work."""
+
+    @wraps(method)
+    def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+        instance = args[0]
+        uow = cast(UnitOfWork, instance._uow)
+        with uow:
+            return method(*args, **kwargs)
+
+    return wrapped
+
+
+def unit_of_work_for(*dependencies: object) -> UnitOfWork:
+    """Return the first adapter-provided UoW, or a no-op boundary for port fakes."""
+    for dependency in dependencies:
+        candidate = getattr(dependency, "unit_of_work", None)
+        if candidate is not None:
+            return cast(UnitOfWork, candidate)
+    return NullUnitOfWork()
 
 
 class PersonNotFoundError(Exception):
