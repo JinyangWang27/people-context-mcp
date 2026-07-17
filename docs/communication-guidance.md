@@ -2,8 +2,8 @@
 
 This document describes how `people-context-mcp` supports communication guidance — helping the user figure
 out how to communicate with a specific person, in the user's own preferred style — and person-linked
-reminders. Both are planned for **M2** (see [docs/roadmap.md](roadmap.md)); the schema for both already
-exists in the M0 data model (`traits`, `reminders`, `user_preferences` — see
+reminders. Both are implemented in **M2** (see [docs/roadmap.md](roadmap.md)); their data lives in the
+M0 schema (`traits`, `reminders`, `user_preferences` — see
 [docs/data-model.md](data-model.md)).
 
 ## Traits
@@ -48,14 +48,18 @@ while still letting any MCP client render advice in its own voice, matched to th
    containing:
    - the person's traits (grouped by category),
    - relevant relationship/role context for that person,
-   - recent interaction friction notes (drawn from interaction summaries),
+   - up to five recent interaction friction notes (newest first, drawn from interaction summaries),
    - any active `communication_note` reminders for that person,
-   - the user's `communication_philosophy` text, verbatim.
+   - the user's `communication_philosophy` text, verbatim (`null` plus `philosophy_set: false` when unset),
+   - the caller's `situation`, echoed unchanged.
 3. The calling LLM composes advice from that bundle, in the user's own framing, for the specific
    `situation` described (if given).
 
 Both tools are described in [docs/mcp-interface.md](mcp-interface.md); `set_communication_philosophy` is a
 write tool, `get_communication_guidance` is read-only.
+
+The implemented guidance path never returns observations. Traits and interactions marked `sensitive` or
+`restricted` are also excluded; M2 deliberately has no `include_sensitive` override on this tool.
 
 ## Reminders
 

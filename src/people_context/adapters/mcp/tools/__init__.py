@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from people_context.adapters.mcp.tools import people, stubs
+from people_context.adapters.mcp.tools import m2, people, stubs
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
@@ -17,4 +17,5 @@ __all__ = ["register_all"]
 def register_all(mcp: FastMCP, deps: ToolDeps) -> None:
     """Register every people-context tool (real use cases + typed stubs)."""
     people.register(mcp, deps)
+    m2.register(mcp, deps)
     stubs.register(mcp)

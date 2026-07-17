@@ -50,6 +50,10 @@ includes fake use-case tests, SQLite hydration, in-memory MCP tests, and a real 
 - Reminders: `set_reminder`, `complete_reminder`, `list_reminders`.
 - Audit log polish (consistent payload shapes across all op types).
 
+**Status:** Delivered. All M2 tools are SQLite-backed and covered by fake-port unit tests, real-SQLite
+integration tests, in-memory MCP tests, and a real stdio write-to-read round trip. M3 lifecycle/import/CLI
+editing remains out of scope and registered as typed stubs.
+
 ## M3 — Lifecycle and import
 
 **Goals:** support the full lifecycle of a record — merging duplicates, forgetting data, exporting it — and

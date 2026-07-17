@@ -18,8 +18,34 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from people_context.adapters.mcp.tools import register_all
-from people_context.adapters.sqlite import SqliteAuditLog, SqliteContextReader, SqlitePeopleRepository, open_db
-from people_context.app import GetPersonContext, RememberPerson, ResolvePerson, SearchPeople
+from people_context.adapters.sqlite import (
+    SqliteAuditLog,
+    SqliteContextReader,
+    SqliteOrganizationStore,
+    SqlitePeopleRepository,
+    SqlitePreferencesStore,
+    SqliteRecordStore,
+    open_db,
+)
+from people_context.app import (
+    AddAlias,
+    CompleteReminder,
+    CorrectRecord,
+    GetCommunicationGuidance,
+    GetPersonContext,
+    ListReminders,
+    RecordFact,
+    RecordInteraction,
+    RecordObservation,
+    RecordTrait,
+    RememberPerson,
+    ResolvePerson,
+    SearchPeople,
+    SetAffiliation,
+    SetCommunicationPhilosophy,
+    SetRelationship,
+    SetReminder,
+)
 from people_context.config import resolve_db_path
 from people_context.ports.clock import SystemClock
 
@@ -48,6 +74,19 @@ class ToolDeps:
     get_person_context: GetPersonContext
     search_people: SearchPeople
     remember_person: RememberPerson
+    add_alias: AddAlias
+    set_relationship: SetRelationship
+    set_affiliation: SetAffiliation
+    record_fact: RecordFact
+    record_observation: RecordObservation
+    record_trait: RecordTrait
+    record_interaction: RecordInteraction
+    correct_record: CorrectRecord
+    set_reminder: SetReminder
+    complete_reminder: CompleteReminder
+    set_communication_philosophy: SetCommunicationPhilosophy
+    get_communication_guidance: GetCommunicationGuidance
+    list_reminders: ListReminders
 
 
 def _configure_logging() -> logging.Logger:
@@ -81,6 +120,9 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
     conn = open_db(path)
     repository = SqlitePeopleRepository(conn)
     context_reader = SqliteContextReader(conn)
+    record_store = SqliteRecordStore(conn)
+    organization_store = SqliteOrganizationStore(conn)
+    preferences_store = SqlitePreferencesStore(conn)
     audit = SqliteAuditLog(conn)
     clock = SystemClock()
 
@@ -89,6 +131,21 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
         get_person_context=GetPersonContext(repository, context_reader, clock),
         search_people=SearchPeople(repository),
         remember_person=RememberPerson(repository, repository, audit, clock),
+        add_alias=AddAlias(repository, repository, audit, clock),
+        set_relationship=SetRelationship(repository, record_store, audit, clock),
+        set_affiliation=SetAffiliation(repository, organization_store, record_store, audit, clock),
+        record_fact=RecordFact(repository, record_store, audit, clock),
+        record_observation=RecordObservation(repository, record_store, audit, clock),
+        record_trait=RecordTrait(repository, record_store, audit, clock),
+        record_interaction=RecordInteraction(repository, record_store, audit, clock),
+        correct_record=CorrectRecord(record_store, record_store, audit, clock),
+        set_reminder=SetReminder(repository, record_store, audit, clock),
+        complete_reminder=CompleteReminder(record_store, record_store, audit, clock),
+        set_communication_philosophy=SetCommunicationPhilosophy(preferences_store, audit, clock),
+        get_communication_guidance=GetCommunicationGuidance(
+            repository, context_reader, preferences_store, clock
+        ),
+        list_reminders=ListReminders(record_store),
     )
 
     mcp = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)

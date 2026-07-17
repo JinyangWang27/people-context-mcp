@@ -66,10 +66,14 @@ def test_tools_list_surface_and_annotations(tmp_path: Path) -> None:
     assert set(by_name) >= EXPECTED_TOOLS
     assert by_name["resolve_person"].annotations.readOnlyHint is True
     assert by_name["get_person_context"].annotations.readOnlyHint is True
+    assert by_name["get_communication_guidance"].annotations.readOnlyHint is True
+    assert by_name["list_reminders"].annotations.readOnlyHint is True
     assert "hints" in by_name["resolve_person"].inputSchema["properties"]
     assert by_name["get_person_context"].inputSchema["properties"]["max_items"]["default"] == 10
     assert by_name["merge_people"].annotations.destructiveHint is True
     assert by_name["remember_person"].annotations.readOnlyHint is False
+    assert by_name["record_fact"].annotations.readOnlyHint is False
+    assert by_name["record_fact"].annotations.destructiveHint is False
 
 
 def test_remember_then_resolve_and_audit_row(tmp_path: Path) -> None:
@@ -101,15 +105,192 @@ def test_remember_then_resolve_and_audit_row(tmp_path: Path) -> None:
     assert any(entry.entity_id == person_id and entry.op == "create" for entry in entries)
 
 
-def test_stub_tool_returns_not_implemented(tmp_path: Path) -> None:
+def test_m3_stub_remains_not_implemented(tmp_path: Path) -> None:
     server = build_server(db_path=tmp_path / "t.db")
 
     async def call(client: ClientSession) -> dict[str, Any]:
-        result = await client.call_tool("record_fact", {"person_id": "x", "predicate": "p", "value": "v"})
+        result = await client.call_tool("import_content", {"source_type": "email", "content": "x"})
         return result.structuredContent
 
     payload = _run(server, call)
-    assert payload == {"status": "not_implemented", "planned_milestone": "M2"}
+    assert payload == {"status": "not_implemented", "planned_milestone": "M3"}
+
+
+def test_m2_write_read_curation_and_guidance_flow(tmp_path: Path) -> None:
+    db_path = tmp_path / "m2.db"
+    server = build_server(db_path=db_path)
+
+    async def flow(client: ClientSession) -> dict[str, Any]:
+        me = (
+            await client.call_tool("remember_person", {"name": "Me", "is_self": True})
+        ).structuredContent["person"]
+        alice = (await client.call_tool("remember_person", {"name": "Alice"})).structuredContent["person"]
+        person_id = alice["id"]
+        await client.call_tool(
+            "set_relationship",
+            {"subject_id": me["id"], "object_id": person_id, "type": "friend_of"},
+        )
+        await client.call_tool(
+            "set_affiliation",
+            {"person_id": person_id, "org": "Acme", "role": "Engineer"},
+        )
+        fact = (
+            await client.call_tool(
+                "record_fact",
+                {"person_id": person_id, "predicate": "location", "value": "Dubia", "sensitivity": "public"},
+            )
+        ).structuredContent
+        sensitive_fact = (
+            await client.call_tool(
+                "record_fact",
+                {"person_id": person_id, "predicate": "private", "value": "secret", "sensitivity": "sensitive"},
+            )
+        ).structuredContent
+        observation = (
+            await client.call_tool("record_observation", {"person_id": person_id, "text": "Never disclose"})
+        ).structuredContent
+        await client.call_tool(
+            "record_trait",
+            {"person_id": person_id, "category": "communication_style", "value": "Prefers concise writing"},
+        )
+        await client.call_tool(
+            "record_trait",
+            {
+                "person_id": person_id,
+                "category": "topics_to_avoid",
+                "value": "Restricted topic",
+                "sensitivity": "restricted",
+            },
+        )
+        await client.call_tool(
+            "record_interaction",
+            {"summary": "Discussed launch friction", "participant_ids": [me["id"], person_id]},
+        )
+        philosophy = "道可道，非常道"
+        await client.call_tool("set_communication_philosophy", {"text": philosophy})
+        follow_up = (
+            await client.call_tool(
+                "set_reminder",
+                {
+                    "person_id": person_id,
+                    "text": "Follow up",
+                    "kind": "follow_up",
+                    "due_at": "2025-07-01T00:00:00+00:00",
+                },
+            )
+        ).structuredContent
+        note = (
+            await client.call_tool(
+                "set_reminder",
+                {"person_id": person_id, "text": "Use email", "kind": "communication_note"},
+            )
+        ).structuredContent
+        listed = (
+            await client.call_tool(
+                "list_reminders",
+                {"person_id": person_id, "due_before": "2025-07-02T00:00:00+00:00"},
+            )
+        ).structuredContent
+        completed = (
+            await client.call_tool("complete_reminder", {"reminder_id": follow_up["id"]})
+        ).structuredContent
+        completed_twice = (
+            await client.call_tool("complete_reminder", {"reminder_id": follow_up["id"]})
+        ).structuredContent
+        corrected = (
+            await client.call_tool(
+                "correct_record", {"entity_type": "fact", "entity_id": fact["id"], "fields": {"value": "Dubai"}}
+            )
+        ).structuredContent
+        rejected_identity = (
+            await client.call_tool(
+                "correct_record",
+                {"entity_type": "fact", "entity_id": fact["id"], "fields": {"person_id": me["id"]}},
+            )
+        ).structuredContent
+        rejected_provenance = (
+            await client.call_tool(
+                "correct_record",
+                {"entity_type": "fact", "entity_id": fact["id"], "fields": {"provenance": {"source": "x"}}},
+            )
+        ).structuredContent
+        context_default = (
+            await client.call_tool("get_person_context", {"person_id": person_id, "max_items": 10})
+        ).structuredContent
+        context_sensitive = (
+            await client.call_tool(
+                "get_person_context", {"person_id": person_id, "max_items": 10, "include_sensitive": True}
+            )
+        ).structuredContent
+        guidance = (
+            await client.call_tool(
+                "get_communication_guidance", {"person_id": person_id, "situation": "Discuss launch"}
+            )
+        ).structuredContent
+        unknown = (
+            await client.call_tool("record_fact", {"person_id": "missing", "predicate": "p", "value": "v"})
+        ).structuredContent
+        return {
+            "person_id": person_id,
+            "fact": fact,
+            "sensitive_fact": sensitive_fact,
+            "observation": observation,
+            "note": note,
+            "listed": listed,
+            "completed": completed,
+            "completed_twice": completed_twice,
+            "corrected": corrected,
+            "rejected_identity": rejected_identity,
+            "rejected_provenance": rejected_provenance,
+            "context_default": context_default,
+            "context_sensitive": context_sensitive,
+            "guidance": guidance,
+            "unknown": unknown,
+            "philosophy": philosophy,
+        }
+
+    payload = _run(server, flow)
+
+    assert payload["unknown"]["error"] == "person_not_found"
+    assert payload["corrected"]["id"] == payload["fact"]["id"]
+    assert payload["corrected"]["value"] == "Dubai"
+    assert payload["rejected_identity"]["error"] == "invalid_correction"
+    assert payload["rejected_provenance"]["error"] == "invalid_correction"
+    assert [reminder["id"] for reminder in payload["listed"]["reminders"]] == [
+        payload["completed"]["id"],
+        payload["note"]["id"],
+    ]
+    assert payload["completed"]["status"] == "completed"
+    assert payload["completed_twice"]["error"] == "reminder_not_active"
+    context_default = payload["context_default"]
+    assert context_default["facts"][0]["value"] == "Dubai"
+    assert payload["sensitive_fact"]["id"] not in {fact["id"] for fact in context_default["facts"]}
+    assert payload["sensitive_fact"]["id"] in {
+        fact["id"] for fact in payload["context_sensitive"]["facts"]
+    }
+    assert context_default["observations"] == []
+    assert context_default["relationships"][0]["relationship"]["type"] == "friend_of"
+    assert context_default["affiliations"][0]["organization_name"] == "Acme"
+    assert context_default["reminders"][0]["id"] == payload["note"]["id"]
+    guidance = payload["guidance"]
+    assert guidance["traits"]["communication_style"][0]["value"] == "Prefers concise writing"
+    assert "topics_to_avoid" not in guidance["traits"]
+    assert guidance["friction_notes"] == ["Discussed launch friction"]
+    assert guidance["communication_philosophy"] == payload["philosophy"]
+    assert guidance["philosophy_set"] is True
+    assert guidance["situation"] == "Discuss launch"
+    assert payload["observation"]["text"] not in str(guidance)
+
+    conn = open_db(db_path)
+    try:
+        entries = SqliteAuditLog(conn).list_entries(limit=100)
+    finally:
+        conn.close()
+    correction = next(entry for entry in entries if entry.op == "correct" and entry.entity_id == payload["fact"]["id"])
+    assert correction.payload["before"]["value"] == "Dubia"
+    assert correction.payload["after"]["value"] == "Dubai"
+    philosophy_entry = next(entry for entry in entries if entry.entity_type == "preference")
+    assert payload["philosophy"] not in str(philosophy_entry.payload)
 
 
 def test_resolve_hints_are_validated_and_real_context_payload_is_returned(tmp_path: Path) -> None:

@@ -214,6 +214,13 @@ Append-only record of every mutation. See
 | `payload_json` | TEXT (JSON) | Op-specific detail. |
 | `source` | TEXT | Provenance source string of the mutation. |
 
+Audit payloads follow one convention across use cases: one mutated row produces one audit entry. Create
+payloads describe the resulting row; ordinary updates describe changed values; corrections and status
+transitions carry `before`, `after`, and a sorted `fields` list. Payloads are JSON-compatible and may use a
+privacy-preserving summary where full content is unnecessary. In particular, communication-philosophy
+audits store only before/after character lengths, never the philosophy text. Organization auto-creation and
+affiliation creation are two row mutations and therefore produce one audit entry each.
+
 ## FTS5 tables
 
 Two SQLite FTS5 virtual tables provide ranked, tokenized search, maintained by the repository on every
@@ -243,9 +250,10 @@ lightweight rather than fully bitemporal:
 This is enough to answer questions like "who was her manager in 2024?" — query `affiliations` (or
 `relationships`) where `valid_from <= 2024-XX-XX <= valid_to` (nullable bound = open-ended) — without the
 complexity of a full bitemporal model that also versions corrections to `recorded_at` itself. If a
-previously recorded fact turns out to have been wrong, it is corrected via `correct_record` (see
-[docs/mcp-interface.md](mcp-interface.md)), which is itself audited, rather than by mutating history in
-place.
+previously recorded assertion turns out to have been wrong, `correct_record` fixes its whitelisted fields in
+place and writes a lossless audit payload containing the full before/after snapshots and changed field names
+(see [docs/mcp-interface.md](mcp-interface.md)). A real-world change over time is represented by a new record
+and validity period instead, not as a correction.
 
 ## Facts vs. observations vs. traits
 

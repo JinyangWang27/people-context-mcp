@@ -33,8 +33,8 @@ Every tool carries an MCP `ToolAnnotations` value that tells clients how to gate
 | `resolve_person` | Resolve a name/query to one or more candidate people, with scores and match reasons. | `query: str`, `hints?: {org?: str, role?: str, relationship?: str}`, `limit: int = 5` | `ResolutionResult`: `query`, `candidates: list[ResolutionCandidate]` (each with `person_id`, `canonical_name`, `score`, `match_reason`, `aliases`, `summary`), `ambiguous: bool` | **Implemented (M1)** |
 | `search_people` | Free-text search over people (broader than resolution — for browsing/lookup rather than pinning down one identity). | `query: str`, `filters?` | `list[ResolutionCandidate]` | **Implemented (M0)** |
 | `get_person_context` | Minimal-disclosure context bundle for a person: narrow identity, active relationships/roles, and top-ranked facts/interactions. | `person_id: str`, `purpose?: str`, `max_items: int = 10`, `include_sensitive: bool = false` | `PersonContextResult`, with the stable shape documented below. | **Implemented (M1)** |
-| `get_communication_guidance` | Structured bundle for composing communication advice: the person's traits, relevant relationship/role context, recent interaction friction notes, active `communication_note` reminders, and the user's communication philosophy text. | `person_id: str`, `situation?: str` | Structured bundle (traits, context, reminders, philosophy text) — advice itself is composed by the client LLM, not the server. | Stub — planned **M2** |
-| `list_reminders` | List reminders, optionally filtered, so agents can surface due follow-ups/occasions on their own schedule (pull-based; no server-side scheduler). | `person_id?: str`, `due_before?`, `status?` | `list[Reminder]` | Stub — planned **M2** |
+| `get_communication_guidance` | Structured bundle for composing communication advice: sensitivity-gated traits, active relationship/role context, up to five newest interaction summaries, active `communication_note` reminders, and the user's communication philosophy text. Observations are never returned. | `person_id: str`, `situation?: str` | `CommunicationGuidanceResult`: `found`, `person_id`, echoed `situation`, `traits: {category: list[Trait]}`, `relationships`, `affiliations`, `friction_notes: list[str]`, `reminders`, `communication_philosophy: str \| null`, `philosophy_set: bool`. | **Implemented (M2)** |
+| `list_reminders` | List reminders, optionally filtered, so agents can surface due follow-ups/occasions on their own schedule (pull-based; no server-side scheduler). | `person_id?: str`, `due_before?: ISO datetime`, `status?: ReminderStatus` (defaults to `active`) | `{"reminders": list[Reminder]}`; due-dated items ordered by `due_at` ascending, then undated communication notes. | **Implemented (M2)** |
 
 ## Write tools
 
@@ -43,17 +43,17 @@ Annotated as writes (not read-only); MCP clients apply their normal approval flo
 | Tool | Purpose | Parameters | Return shape | Status |
 |---|---|---|---|---|
 | `remember_person` | Create or update a person by name; merges aliases and optionally sets a summary. | `name: str`, `aliases?: list[{value, kind, lang?, script?}]`, `summary?: str`, `is_self?: bool`, `source?: str`, `session?: str` | `RememberPersonResult`: `person: Person`, `created: bool` | **Implemented (M0)** |
-| `add_alias` | Add an alias (nickname, native-script name, transliteration, handle, former name) to an existing person. | `person_id`, `value`, `kind?`, `lang?`, `script?` | Updated `Person` | Stub — planned **M2** |
-| `set_relationship` | Create/update a directed, typed relationship between two people. | `subject_id`, `object_id`, `type`, `label?`, `valid_from?`, `valid_to?`, `confidence?` | `Relationship` | Stub — planned **M2** |
-| `set_affiliation` | Create/update a person's role at an organization over a period. | `person_id`, `org_id` (or org name), `role`, `valid_from?`, `valid_to?`, `confidence?` | `Affiliation` | Stub — planned **M2** |
-| `record_fact` | Record a time-aware fact about a person. | `person_id`, `predicate`, `value`, `valid_from?`, `valid_to?`, `confidence?`, `sensitivity?` | `Fact` | Stub — planned **M2** |
-| `record_observation` | Record a subjective observation about a person. | `person_id`, `text`, `observed_at?`, `sensitivity?` | `Observation` | Stub — planned **M2** |
-| `record_trait` | Record a derived characteristic (communication style, temperament, values, preference, topics to avoid). | `person_id`, `category`, `value`, `evidence_note?`, `confidence?`, `sensitivity?` | `Trait` | Stub — planned **M2** |
-| `record_interaction` | Record a concise interaction summary and its participants. | `summary`, `occurred_at?`, `channel?`, `participant_ids`, `sensitivity?` | `Interaction` | Stub — planned **M2** |
-| `correct_record` | Correct a previously recorded fact/observation/trait/relationship/affiliation without silently overwriting history. | `entity_type`, `entity_id`, corrected fields | Updated entity | Stub — planned **M2** |
-| `set_reminder` | Create a reminder for a person. | `person_id`, `text`, `kind`, `due_at?`, `recurrence?` | `Reminder` | Stub — planned **M2** |
-| `complete_reminder` | Mark a reminder completed. | `reminder_id` | Updated `Reminder` | Stub — planned **M2** |
-| `set_communication_philosophy` | Store/update the user's free-text communication guidance framework. | `text: str` | `CommunicationPhilosophy` | Stub — planned **M2** |
+| `add_alias` | Add an alias (nickname, native-script name, transliteration, handle, former name) to an existing person. | `person_id`, `value`, `kind?`, `lang?`, `script?` | Updated `Person` | **Implemented (M2)** |
+| `set_relationship` | Create a directed, typed relationship between two existing people. | `subject_id`, `object_id`, `type`, `label?`, `valid_from?`, `valid_to?`, `confidence?` | `Relationship` | **Implemented (M2)** |
+| `set_affiliation` | Create a person's role at an organization over a period; `org` accepts an existing id or a name to get/create. | `person_id`, `org`, `role`, `valid_from?`, `valid_to?`, `confidence?` | `Affiliation` | **Implemented (M2)** |
+| `record_fact` | Record a time-aware fact about an existing person. | `person_id`, `predicate`, `value`, `valid_from?`, `valid_to?`, `confidence?`, `sensitivity?` | `Fact` | **Implemented (M2)** |
+| `record_observation` | Record a subjective observation about an existing person. | `person_id`, `text`, `observed_at?`, `sensitivity?` | `Observation` | **Implemented (M2)** |
+| `record_trait` | Record a derived characteristic with a category validated against `TraitCategory`. | `person_id`, `category`, `value`, `evidence_note?`, `confidence?`, `sensitivity?` | `Trait` | **Implemented (M2)** |
+| `record_interaction` | Record a concise interaction summary after validating every participant id. | `summary`, `participant_ids`, `occurred_at?`, `channel?`, `sensitivity?` | `Interaction` | **Implemented (M2)** |
+| `correct_record` | Correct whitelisted fields in place for a fact, observation, trait, relationship, affiliation, or reminder; audit retains full before/after snapshots. | `entity_type`, `entity_id`, `fields` | Updated entity | **Implemented (M2)** |
+| `set_reminder` | Create a kind-validated reminder for an existing person. | `person_id`, `text`, `kind`, `due_at?`, `recurrence?` | `Reminder` | **Implemented (M2)** |
+| `complete_reminder` | Transition an active reminder to completed. | `reminder_id` | Updated `Reminder` | **Implemented (M2)** |
+| `set_communication_philosophy` | Store/update the user's free-text communication guidance framework. | `text: str` | `CommunicationPhilosophy`; audit contains lengths only. | **Implemented (M2)** |
 | `import_content` | Extract candidate person/alias/fact/interaction records from a source (e.g. an `.eml`/mbox file) into staging. Raw content is parsed in-memory and discarded — never persisted. | `source_type`, `content` or `path` | Staging batch summary (`batch_id`, candidate count) | Stub — planned **M3** |
 | `review_import` | Return the staged candidates for a batch for user review. | `batch_id` | List of staged candidates | Stub — planned **M3** |
 | `commit_import` | Write the accepted staged candidates into the real tables, with provenance `source: import/<type>`. | `batch_id`, `accepted_ids` | Summary of records written | Stub — planned **M3** |
@@ -68,8 +68,19 @@ Annotated `destructiveHint: true`.
 | `forget` | Hard delete a target (person or narrower scope) and write a tombstone audit entry. | `target`, `scope` | Confirmation of what was deleted | Stub — planned **M3** |
 | `export_data` | Full JSON export of the dataset, for portability. | (none) | JSON document of all records | Stub — planned **M3** |
 
-Stub tools currently return a fixed shape: `{"status": "not_implemented", "planned_milestone": "M2" | "M3"}`,
-so the full intended surface is visible in any MCP client's tool list even before each tool is implemented.
+Remaining M3 stub tools return a fixed shape:
+`{"status": "not_implemented", "planned_milestone": "M3"}`, so the lifecycle/import surface remains
+visible in MCP clients without implying implementation.
+
+## M2 write errors
+
+M2 tools return domain failures as structured result objects rather than protocol exceptions. Common shapes
+start with `{"error": "person_not_found", "person_id": ...}`, `{"error": "record_not_found",
+"entity_type": ..., "entity_id": ...}`, `{"error": "invalid_correction", "fields": [...],
+"allowed_fields": [...]}`, `{"error": "reminder_not_active", "reminder_id": ..., "status": ...}`, or
+`{"error": "validation_error", "details": [...]}`. Writes never create an implicit person. For
+`set_affiliation`, a supplied existing organization id is used directly; a name is normalized and
+get-or-created.
 
 ## The ambiguity contract of `resolve_person`
 

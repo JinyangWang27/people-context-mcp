@@ -11,7 +11,7 @@ import anyio
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from people_context.adapters.sqlite import open_db
+from people_context.adapters.sqlite import SqliteAuditLog, SqliteContextReader, open_db
 
 
 def test_real_stdio_remember_resolve_with_hints_context_then_cli_show(tmp_path: Path) -> None:
@@ -71,6 +71,95 @@ def test_real_stdio_remember_resolve_with_hints_context_then_cli_show(tmp_path: 
     assert "Engineer at Acme Corp" in shown.stdout
     assert "location: Dubai" in shown.stdout
     assert "Prefer written updates" in shown.stdout
+
+
+def test_real_stdio_m2_full_write_read_guidance_round_trip(tmp_path: Path) -> None:
+    uv = shutil.which("uv")
+    assert uv is not None
+    project_root = Path(__file__).parents[2]
+    db_path = tmp_path / "m2-stdio.db"
+    parameters = StdioServerParameters(
+        command=uv,
+        args=["run", "people-context-mcp", "--db", str(db_path)],
+        cwd=project_root,
+    )
+    philosophy = "道可道，非常道；上善若水。"
+
+    async def flow() -> tuple[str, dict[str, Any], dict[str, Any], str]:
+        async with (
+            stdio_client(parameters) as (read_stream, write_stream),
+            ClientSession(read_stream, write_stream) as client,
+        ):
+            await client.initialize()
+            me = (
+                await client.call_tool("remember_person", {"name": "Me", "is_self": True})
+            ).structuredContent["person"]
+            alice = (
+                await client.call_tool("remember_person", {"name": "Alice Example"})
+            ).structuredContent["person"]
+            person_id = alice["id"]
+            await client.call_tool(
+                "set_relationship",
+                {"subject_id": me["id"], "object_id": person_id, "type": "friend_of"},
+            )
+            await client.call_tool(
+                "set_affiliation",
+                {"person_id": person_id, "org": "Acme Corp", "role": "Engineer"},
+            )
+            await client.call_tool(
+                "record_fact",
+                {"person_id": person_id, "predicate": "location", "value": "Dubai", "sensitivity": "public"},
+            )
+            observation = (
+                await client.call_tool(
+                    "record_observation", {"person_id": person_id, "text": "Subjective and private"}
+                )
+            ).structuredContent
+            await client.call_tool(
+                "record_trait",
+                {
+                    "person_id": person_id,
+                    "category": "communication_style",
+                    "value": "Prefers written summaries",
+                },
+            )
+            await client.call_tool(
+                "record_interaction",
+                {"summary": "Needed a clearer scope", "participant_ids": [me["id"], person_id]},
+            )
+            await client.call_tool("set_communication_philosophy", {"text": philosophy})
+            context = (
+                await client.call_tool("get_person_context", {"person_id": person_id, "max_items": 10})
+            ).structuredContent
+            guidance = (
+                await client.call_tool(
+                    "get_communication_guidance", {"person_id": person_id, "situation": "Plan launch"}
+                )
+            ).structuredContent
+            return person_id, context, guidance, observation["id"]
+
+    person_id, context, guidance, observation_id = anyio.run(flow)
+
+    assert context["facts"][0]["value"] == "Dubai"
+    assert context["relationships"][0]["relationship"]["type"] == "friend_of"
+    assert context["affiliations"][0]["organization_name"] == "Acme Corp"
+    assert context["observations"] == []
+    assert guidance["traits"]["communication_style"][0]["value"] == "Prefers written summaries"
+    assert guidance["friction_notes"] == ["Needed a clearer scope"]
+    assert guidance["communication_philosophy"] == philosophy
+    assert guidance["situation"] == "Plan launch"
+    assert "Subjective and private" not in str(guidance)
+
+    conn = open_db(db_path)
+    try:
+        observations = SqliteContextReader(conn).list_observations(person_id)
+        entries = SqliteAuditLog(conn).list_entries(limit=100)
+    finally:
+        conn.close()
+    assert [observation.id for observation in observations] == [observation_id]
+    assert len(entries) == 10
+    philosophy_entry = next(entry for entry in entries if entry.entity_type == "preference")
+    assert philosophy not in str(philosophy_entry.payload)
 
 
 def _seed_context(db_path: Path, person_id: str) -> None:
