@@ -5,6 +5,7 @@ from __future__ import annotations
 from people_context.app.add_alias import AddAlias, AddAliasInput
 from people_context.app.complete_reminder import CompleteReminder, CompleteReminderInput
 from people_context.app.correct_record import CorrectRecord, CorrectRecordInput
+from people_context.app.forget import Forget, ForgetError, ForgetPreview, ForgetResult, PreviewForget
 from people_context.app.get_communication_guidance import CommunicationGuidanceResult, GetCommunicationGuidance
 from people_context.app.get_person_context import (
     GetPersonContext,
@@ -53,6 +54,10 @@ __all__ = [
     "GetPersonContext",
     "CommunicationGuidanceResult",
     "GetCommunicationGuidance",
+    "Forget",
+    "ForgetError",
+    "ForgetPreview",
+    "ForgetResult",
     "ListReminders",
     "ListRemindersInput",
     "MergeMovedCounts",
@@ -70,6 +75,7 @@ __all__ = [
     "PersonContextResult",
     "PersonIdentity",
     "PersonRelationshipContext",
+    "PreviewForget",
     "PersonNotFoundError",
     "RecordFact",
     "RecordFactInput",

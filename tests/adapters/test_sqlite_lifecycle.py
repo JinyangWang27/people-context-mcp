@@ -7,17 +7,19 @@ from datetime import UTC, datetime
 import pytest
 
 from people_context.adapters.sqlite import (
+    SqliteAuditLog,
     SqliteLifecycleStore,
     SqlitePeopleRepository,
     SqliteRecordStore,
     open_db,
 )
-from people_context.app import MergePeople, MergePeopleError
+from people_context.app import Forget, MergePeople, MergePeopleError
 from people_context.domain.fact import Fact
 from people_context.domain.interaction import Interaction
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.domain.relationship import Relationship
 from people_context.domain.shared import Provenance
+from people_context.ports.audit_log import AuditEntry
 
 _NOW = datetime(2026, 1, 2, 3, 4, tzinfo=UTC)
 _PROVENANCE = Provenance(source="test")
@@ -122,3 +124,104 @@ def test_merge_people_validates_same_person_and_self_direction() -> None:
     with pytest.raises(MergePeopleError, match="primary") as direction:
         merge.execute(other.id, self_person.id)
     assert direction.value.code == "self_merge_direction"
+
+
+def test_forget_person_deletes_graph_orphan_interactions_and_redacts_audits() -> None:
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    records = SqliteRecordStore(conn)
+    audit = SqliteAuditLog(conn)
+    forgotten = _person("Me", is_self=True)
+    forgotten.aliases.append(Alias(value="my-handle", kind=AliasKind.HANDLE))
+    other = _person("Other")
+    people.save_person(forgotten)
+    people.save_person(other)
+    records.save_fact(Fact(person_id=forgotten.id, predicate="secret", value="x", provenance=_PROVENANCE))
+    relationship = Relationship(
+        subject_id=other.id,
+        object_id=forgotten.id,
+        type="knows",
+        provenance=_PROVENANCE,
+        created_at=_NOW,
+    )
+    records.save_relationship(relationship)
+    orphaned = Interaction(
+        summary="Only me", occurred_at=_NOW, participant_ids=[forgotten.id], provenance=_PROVENANCE
+    )
+    shared = Interaction(
+        summary="Both", occurred_at=_NOW, participant_ids=[forgotten.id, other.id], provenance=_PROVENANCE
+    )
+    records.save_interaction(orphaned)
+    records.save_interaction(shared)
+    audit.append(
+        AuditEntry(
+            ts=_NOW,
+            op="create",
+            entity_type="interaction",
+            entity_id=shared.id,
+            payload={"nested": [{"person": forgotten.id}]},
+            source="test",
+        )
+    )
+
+    result = Forget(people, SqliteLifecycleStore(conn), _Clock()).execute(forgotten.id, "person")
+
+    assert result.deleted["persons"] == 1
+    assert result.deleted["aliases"] == 1
+    assert result.deleted["facts"] == 1
+    assert result.deleted["relationships"] == 1
+    assert result.deleted["interaction_participations"] == 2
+    assert result.deleted["interactions"] == 1
+    assert people.get(forgotten.id) is None
+    assert records.get_record("interaction", orphaned.id) is None
+    assert records.get_record("interaction", shared.id).participant_ids == [other.id]  # type: ignore[union-attr]
+    rows = conn.execute("SELECT op, payload_json FROM audit_log ORDER BY rowid").fetchall()
+    assert rows[0]["payload_json"] == '{"redacted": true}'
+    assert rows[1]["op"] == "forget"
+    assert forgotten.id not in rows[1]["payload_json"]
+
+
+def test_forget_record_removes_only_target_and_interaction_participations() -> None:
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    records = SqliteRecordStore(conn)
+    person = _person("Alice")
+    people.save_person(person)
+    interaction = Interaction(
+        summary="Meeting", occurred_at=_NOW, participant_ids=[person.id], provenance=_PROVENANCE
+    )
+    records.save_interaction(interaction)
+
+    result = Forget(people, SqliteLifecycleStore(conn), _Clock()).execute(
+        f"interaction:{interaction.id}", "record"
+    )
+
+    assert result.deleted == {"interactions": 1, "interaction_participations": 1}
+    assert people.get(person.id) is not None
+    assert records.get_record("interaction", interaction.id) is None
+
+
+def test_forget_rolls_back_deletion_and_redaction_on_failure() -> None:
+    conn = open_db(":memory:")
+    people = SqlitePeopleRepository(conn)
+    person = _person("Alice")
+    people.save_person(person)
+    SqliteAuditLog(conn).append(
+        AuditEntry(
+            ts=_NOW,
+            op="create",
+            entity_type="person",
+            entity_id=person.id,
+            payload={"name": "Alice"},
+            source="test",
+        )
+    )
+
+    def fail(_: str) -> None:
+        raise RuntimeError("injected")
+
+    with pytest.raises(RuntimeError, match="injected"):
+        Forget(people, SqliteLifecycleStore(conn, fail), _Clock()).execute(person.id, "person")
+
+    assert people.get(person.id) is not None
+    assert conn.execute("SELECT payload_json FROM audit_log").fetchone()[0] == '{"name": "Alice"}'

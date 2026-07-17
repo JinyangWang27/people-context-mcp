@@ -35,11 +35,6 @@ def register(mcp: FastMCP) -> None:
         """Write accepted staged candidates with import provenance."""
         return _pending("M3")
 
-    @mcp.tool(annotations=_DESTRUCTIVE)
-    def forget(target: str, scope: str) -> dict[str, Any]:
-        """Hard-delete a target and retain only an audit tombstone."""
-        return _pending("M3")
-
     @mcp.tool(annotations=_WRITE)
     def export_data() -> dict[str, Any]:
         """Export the full dataset as a maximal-disclosure JSON document."""

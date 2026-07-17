@@ -32,6 +32,7 @@ from people_context.app import (
     AddAlias,
     CompleteReminder,
     CorrectRecord,
+    Forget,
     GetCommunicationGuidance,
     GetPersonContext,
     ListReminders,
@@ -90,6 +91,7 @@ class ToolDeps:
     get_communication_guidance: GetCommunicationGuidance
     list_reminders: ListReminders
     merge_people: MergePeople
+    forget: Forget
 
 
 def _configure_logging() -> logging.Logger:
@@ -151,6 +153,7 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
         ),
         list_reminders=ListReminders(record_store),
         merge_people=MergePeople(repository, lifecycle_store, clock),
+        forget=Forget(repository, lifecycle_store, clock),
     )
 
     mcp = FastMCP(name=SERVER_NAME, instructions=SERVER_INSTRUCTIONS)

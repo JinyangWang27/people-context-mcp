@@ -9,6 +9,7 @@ from collections.abc import Callable
 from people_context.domain.person import Person
 from people_context.domain.shared import normalize_name
 from people_context.ports.audit_log import AuditEntry
+from people_context.ports.lifecycle import LifecycleTargetNotFoundError
 
 
 class SqliteLifecycleStore:
@@ -45,6 +46,104 @@ class SqliteLifecycleStore:
             self._conn.execute("DELETE FROM person_search WHERE person_id = ?", (duplicate_id,))
             self._checkpoint("before_audit")
             self._insert_audit(audit_factory(counts))
+        return counts
+
+    def forget_person(
+        self,
+        person_id: str,
+        audit_factory: Callable[[dict[str, int]], AuditEntry],
+    ) -> dict[str, int]:
+        """Hard-delete a person graph, redact prior audits, and add one tombstone."""
+        with self._conn:
+            counts = self.preview_person_forget(person_id)
+            orphan_ids = [
+                row["interaction_id"]
+                for row in self._conn.execute(
+                    """SELECT ip.interaction_id
+                       FROM interaction_participants ip
+                       WHERE ip.person_id = ?
+                         AND (SELECT COUNT(*) FROM interaction_participants all_ip
+                              WHERE all_ip.interaction_id = ip.interaction_id) = 1""",
+                    (person_id,),
+                ).fetchall()
+            ]
+            self._redact_audits(person_id, person_id)
+            self._conn.execute("DELETE FROM persons WHERE id = ?", (person_id,))
+            if orphan_ids:
+                placeholders = ", ".join("?" for _ in orphan_ids)
+                self._conn.execute(
+                    f"DELETE FROM interactions WHERE id IN ({placeholders})",  # noqa: S608 - placeholders only
+                    orphan_ids,
+                )
+            counts["interactions"] = len(orphan_ids)
+            self._checkpoint("before_audit")
+            self._insert_audit(audit_factory(counts))
+        return counts
+
+    def forget_record(
+        self,
+        entity_type: str,
+        entity_id: str,
+        audit_factory: Callable[[dict[str, int]], AuditEntry],
+    ) -> dict[str, int]:
+        """Hard-delete one assertion/reminder/interaction and add one tombstone."""
+        tables = {
+            "relationship": "relationships",
+            "affiliation": "affiliations",
+            "fact": "facts",
+            "observation": "observations",
+            "trait": "traits",
+            "interaction": "interactions",
+            "reminder": "reminders",
+        }
+        table = tables[entity_type]
+        with self._conn:
+            row = self._conn.execute(
+                f"SELECT id FROM {table} WHERE id = ?",  # noqa: S608 - internal table map
+                (entity_id,),
+            ).fetchone()
+            if row is None:
+                raise LifecycleTargetNotFoundError(entity_id)
+            deleted = {table: 1}
+            if entity_type == "interaction":
+                count = self._conn.execute(
+                    "SELECT COUNT(*) FROM interaction_participants WHERE interaction_id = ?",
+                    (entity_id,),
+                ).fetchone()[0]
+                deleted["interaction_participations"] = count
+            self._redact_audits(entity_id, None)
+            self._conn.execute(
+                f"DELETE FROM {table} WHERE id = ?",  # noqa: S608 - internal table map
+                (entity_id,),
+            )
+            self._checkpoint("before_audit")
+            self._insert_audit(audit_factory(deleted))
+        return deleted
+
+    def preview_person_forget(self, person_id: str) -> dict[str, int]:
+        """Count rows a person-scope forget would delete without mutation."""
+        counts = {"persons": 1}
+        for key, table in (
+            ("aliases", "aliases"),
+            ("facts", "facts"),
+            ("observations", "observations"),
+            ("traits", "traits"),
+            ("reminders", "reminders"),
+            ("affiliations", "affiliations"),
+        ):
+            counts[key] = self._conn.execute(
+                f"SELECT COUNT(*) FROM {table} WHERE person_id = ?",  # noqa: S608 - internal table constants
+                (person_id,),
+            ).fetchone()[0]
+        counts["relationships"] = self._conn.execute(
+            "SELECT COUNT(*) FROM relationships WHERE subject_id = ? OR object_id = ?",
+            (person_id, person_id),
+        ).fetchone()[0]
+        counts["interaction_participations"] = self._conn.execute(
+            "SELECT COUNT(*) FROM interaction_participants WHERE person_id = ?",
+            (person_id,),
+        ).fetchone()[0]
+        counts["interactions"] = 0
         return counts
 
     def _save_primary(self, person: Person, duplicate_id: str) -> None:
@@ -142,6 +241,25 @@ class SqliteLifecycleStore:
             ),
         )
 
+    def _redact_audits(self, entity_id: str, forgotten_person_id: str | None) -> None:
+        rows = self._conn.execute("SELECT id, entity_id, payload_json FROM audit_log").fetchall()
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            contains_person = forgotten_person_id is not None and _contains_scalar(payload, forgotten_person_id)
+            if row["entity_id"] == entity_id or contains_person:
+                self._conn.execute(
+                    "UPDATE audit_log SET payload_json = ? WHERE id = ?",
+                    (json.dumps({"redacted": True}), row["id"]),
+                )
+
     def _checkpoint(self, name: str) -> None:
         if self._failure_hook is not None:
             self._failure_hook(name)
+
+
+def _contains_scalar(value: object, target: str) -> bool:
+    if isinstance(value, dict):
+        return any(_contains_scalar(item, target) for item in value.values())
+    if isinstance(value, list):
+        return any(_contains_scalar(item, target) for item in value)
+    return value == target
