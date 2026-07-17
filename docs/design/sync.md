@@ -137,7 +137,7 @@ entries are append-only; forget is an explicit, replicated exception that remove
 Extending `audit_log` would avoid a second table, but it would couple two incompatible payload policies. Full
 preference text and complete lifecycle manifests are necessary for replay but are deliberately absent from the
 audit trail. A dedicated changelog keeps the privacy-facing audit contract narrow while making replication
-requirements explicit. See proposed ADR [0004](../decisions/0004-changelog-vs-audit-log.md).
+requirements explicit. See accepted ADR [0004](../decisions/0004-changelog-vs-audit-log.md).
 
 ## 3. Operation model
 
@@ -249,7 +249,7 @@ Automatic conflict resolution must never reduce identity-resolution correctness.
 
 When an automatic result would violate those rules, the replica records a conflict object and excludes the
 ambiguous change from normal resolution until the user reviews it. This conservative boundary is more important
-than convergence without intervention. See proposed ADR
+than convergence without intervention. See accepted ADR
 [0005](../decisions/0005-conflict-resolution-strategy.md).
 
 ## 5. Forget and redaction across replicas
@@ -413,7 +413,7 @@ and existing rows have no ownership or sharing columns.
 
 ## 8. Migration path appendix
 
-This is a sketch for a future migration `002`; **it is not implemented by M5**.
+M6 implements the single-user subset of this migration sketch. `sync_peer_cursors` remains deferred to M7.
 
 Minimal backward-compatible additions could include:
 
@@ -465,8 +465,8 @@ CREATE TABLE sync_conflicts (
 );
 ```
 
-The migration would also need transactional write integration so each primary mutation, audit entry, and
-changelog transaction commit or roll back together. Existing rows require a bootstrap snapshot rather than
+M6 adds transactional write integration so each primary mutation, audit entry, HLC advance, and changelog
+transaction commit or roll back together. Existing rows require a bootstrap snapshot rather than
 invented historical operations. Multi-user support would later add owner/user/actor tables, ownership columns,
 and sharing grants; those should not be added to a single-user sync migration without a concrete authorization
 design.

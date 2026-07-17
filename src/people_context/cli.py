@@ -23,6 +23,7 @@ from people_context.adapters.semantic_indexing import (
 )
 from people_context.adapters.sqlite import (
     SqliteAuditLog,
+    SqliteChangelog,
     SqliteContextReader,
     SqliteExportReader,
     SqliteLifecycleStore,
@@ -70,6 +71,7 @@ class CliContext:
     audit: SqliteAuditLog
     lifecycle: SqliteLifecycleStore | IndexingLifecycleStore
     preferences: SqlitePreferencesStore
+    changelog: SqliteChangelog | None = None
 
 
 def _open_context(db: str | None) -> CliContext:
@@ -99,6 +101,7 @@ def _open_context(db: str | None) -> CliContext:
         clock=SystemClock(),
         export_reader=SqliteExportReader(conn),
         audit=SqliteAuditLog(conn),
+        changelog=SqliteChangelog(conn),
         lifecycle=lifecycle,
         preferences=SqlitePreferencesStore(conn),
     )
@@ -147,6 +150,15 @@ def build_parser() -> argparse.ArgumentParser:
     delete.add_argument("person", help="An active person id, or a name to resolve.")
     delete.add_argument("--yes", action="store_true", help="Skip the confirmation prompt.")
 
+    sync_log = subparsers.add_parser("sync-log", help="Inspect the local replayable changelog.")
+    sync_log.add_argument("--limit", type=int, default=50, help="Maximum number of recent entries.")
+    sync_log.add_argument("--entity", default=None, help="Filter by exact entity id.")
+    sync_log.add_argument(
+        "--payloads",
+        action="store_true",
+        help="Include full replay payloads; hidden by default because they may contain sensitive data.",
+    )
+
     reindex = subparsers.add_parser("reindex", help="Rebuild active-person full-text search rows.")
     reindex.add_argument(
         "--semantic",
@@ -183,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
             return _cmd_set(ctx, args)
         if args.command == "delete":
             return _cmd_delete(ctx, args)
+        if args.command == "sync-log":
+            return _cmd_sync_log(ctx, args)
         if args.command == "reindex":
             return _cmd_reindex(ctx, args)
         parser.error(f"unknown command: {args.command}")
@@ -385,6 +399,25 @@ def _cmd_delete(ctx: CliContext, args: argparse.Namespace) -> int:
         return 0
     Forget(ctx.repo, ctx.lifecycle, ctx.clock, ctx.audit).execute(person.id, "person")
     print("Deleted.")
+    return 0
+
+
+def _cmd_sync_log(ctx: CliContext, args: argparse.Namespace) -> int:
+    if ctx.changelog is None:
+        raise RuntimeError("sync-log requires a changelog adapter")
+    entries = ctx.changelog.list_entries(limit=args.limit, entity_id=args.entity)
+    if not entries:
+        print("No changelog entries.")
+        return 0
+    for entry in entries:
+        fields = ",".join(entry.changed_fields) if entry.changed_fields else "-"
+        print(
+            f"{entry.op_kind}  {entry.entity_type}:{entry.entity_id}  device={entry.device_id}  "
+            f"hlc={entry.hlc_physical_ms}:{entry.hlc_logical}  fields={fields}"
+        )
+        if args.payloads:
+            payload = json.dumps(entry.payload, ensure_ascii=False, sort_keys=True)
+            print(f"  payload={payload}")
     return 0
 
 
