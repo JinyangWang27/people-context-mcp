@@ -38,7 +38,8 @@ See [docs/roadmap.md](docs/roadmap.md) for the remaining milestone plan.
   own communication philosophy text); the client LLM composes advice in the user's own voice.
 - **Reminders** — follow-ups, occasions, and standing communication notes, pulled by clients on demand.
 - **Provenance, confidence, sensitivity, audit** on every assertive record, plus forget, merge, and export.
-- **Local SQLite persistence** — a single, plain, user-owned file; no network calls, no server-side accounts.
+- **Local SQLite persistence** — a single, plain, user-owned file; no server-side accounts. Stdio is the
+  default transport, with an explicit unauthenticated loopback-only HTTP option.
 
 ## Quick start
 
@@ -55,6 +56,17 @@ Run the server directly (stdio transport):
 ```bash
 uv run people-context-mcp
 ```
+
+For a local HTTP client, opt into Streamable HTTP on loopback:
+
+```bash
+uv run people-context-mcp --http --host 127.0.0.1 --port 8765
+```
+
+The HTTP endpoint is `http://127.0.0.1:8765/mcp`. It is unauthenticated and intentionally binds only to
+`127.0.0.1`; every process running as any local user that can reach loopback should be treated as a potential
+client. DNS-rebinding checks restrict accepted hosts and browser origins to `127.0.0.1` and `localhost`.
+Remote binding and authenticated HTTP access are deferred.
 
 ### Wire into Claude Code
 

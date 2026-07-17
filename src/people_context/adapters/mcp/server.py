@@ -1,4 +1,4 @@
-"""FastMCP stdio server wiring: build the server, register tools, run over stdio.
+"""FastMCP server wiring with stdio and loopback Streamable HTTP transports.
 
 This adapter is the only place the MCP SDK is imported. It resolves the database
 path, opens the SQLite store, constructs the repository/audit/clock and the app
@@ -16,6 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.transport_security import TransportSecuritySettings
 
 from people_context.adapters.email_import import EmailImportExtractor
 from people_context.adapters.mcp.tools import register_all
@@ -180,8 +181,8 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
     return mcp
 
 
-def main() -> None:
-    """CLI entry point: parse ``--db`` and run the server over stdio."""
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the server entrypoint parser without constructing application state."""
     parser = argparse.ArgumentParser(
         prog="people-context-mcp",
         description="Local-first MCP server with contextual knowledge about the people in your life.",
@@ -192,8 +193,42 @@ def main() -> None:
         default=None,
         help="Path to the SQLite database file (overrides env/config/auto-detect).",
     )
-    args = parser.parse_args()
-    build_server(args.db).run()
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Serve Streamable HTTP on loopback instead of stdio.",
+    )
+    parser.add_argument(
+        "--host",
+        choices=("127.0.0.1",),
+        default="127.0.0.1",
+        help="HTTP bind host; only 127.0.0.1 is accepted (default: 127.0.0.1).",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="HTTP bind port (default: 8765).",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    """Select stdio by default or explicitly configured loopback Streamable HTTP."""
+    args = _build_parser().parse_args(argv)
+    server = build_server(args.db)
+    if not args.http:
+        server.run()
+        return
+
+    server.settings.host = args.host
+    server.settings.port = args.port
+    server.settings.transport_security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=["127.0.0.1:*", "localhost:*"],
+        allowed_origins=["http://127.0.0.1:*", "http://localhost:*"],
+    )
+    server.run(transport="streamable-http")
 
 
 if __name__ == "__main__":

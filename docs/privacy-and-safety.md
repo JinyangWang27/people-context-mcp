@@ -101,6 +101,12 @@ See [docs/mcp-interface.md](mcp-interface.md#annotations).
 
 ## Threat model notes
 
+- **Loopback HTTP is unauthenticated.** `people-context-mcp --http` binds only to `127.0.0.1` and enables
+  DNS-rebinding protection for `127.0.0.1`/`localhost` hosts and HTTP origins. This prevents remote binding
+  and common browser rebinding attacks, but it is not process isolation: every local process able to reach
+  loopback can attempt to use the MCP endpoint. Do not run it on a shared machine unless that trust boundary
+  is acceptable. Authenticated or remotely reachable HTTP is explicitly deferred.
+
 - **The database file is plaintext SQLite.** Anyone with filesystem read access to the `.db` file (and its
   `-wal`/`-shm` companions while the server is running) can read its contents directly — there is no
   application-level encryption in v1. This is a deliberate trade-off for a plain, user-inspectable,
