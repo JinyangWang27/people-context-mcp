@@ -12,6 +12,7 @@ MODEL_ID = f"{MODEL_REPOSITORY}@{MODEL_REVISION}"
 MODEL_DIMENSION = 256
 MODEL_URL = f"https://huggingface.co/{MODEL_REPOSITORY}/tree/{MODEL_REVISION}"
 MODEL_DOWNLOAD_SIZE = "approximately 512 MB"
+_MODEL_SNAPSHOT_FILES = ("README.md", "config.json", "model.safetensors", "tokenizer.json")
 
 
 class SemanticPackageNotAvailableError(RuntimeError):
@@ -68,6 +69,7 @@ def download_embedding_provider() -> Model2VecEmbeddingProvider:
         repo_id=MODEL_REPOSITORY,
         revision=MODEL_REVISION,
         cache_dir=semantic_cache_dir(),
+        allow_patterns=list(_MODEL_SNAPSHOT_FILES),
         local_files_only=False,
     )
     return Model2VecEmbeddingProvider(StaticModel.from_pretrained(model_path, force_download=False))
@@ -86,6 +88,7 @@ def create_local_embedding_provider() -> Model2VecEmbeddingProvider:
             repo_id=MODEL_REPOSITORY,
             revision=MODEL_REVISION,
             cache_dir=semantic_cache_dir(),
+            allow_patterns=list(_MODEL_SNAPSHOT_FILES),
             local_files_only=True,
         )
     except Exception as exc:
