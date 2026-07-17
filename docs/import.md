@@ -84,7 +84,12 @@ The single hard rule for every importer: **raw source content is never persisted
 candidates plus a provenance reference are stored in `import_staging`, and only accepted candidates ever
 reach the real tables:
 
-- A candidate `Interaction` gets a short prose summary, not the message body.
+- A candidate `Interaction` gets a short prose summary, not the message body. For the email/mbox importer
+  this summary is the fixed neutral string `Email correspondence`; the `Subject` header is attacker-controlled
+  text that would otherwise be replayed into a future model's context, so it is deliberately not persisted (see
+  [docs/privacy-and-safety.md](privacy-and-safety.md)). When a topical summary is wanted, an agent that has
+  itself read the source can compose one and submit it through `stage_candidates`, taking responsibility for
+  the wording; that path flows through the same review-and-commit approval as file imports.
 - Provenance for imported records references the source narrowly — e.g. the email's `Message-Id` header and
   its date — enough to trace where a fact came from, without storing the message itself.
 - Email addresses are stored as `aliases` of kind `handle` (see [docs/data-model.md](data-model.md#aliases))

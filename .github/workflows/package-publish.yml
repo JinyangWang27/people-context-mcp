@@ -8,12 +8,45 @@ on:
   workflow_dispatch:
 
 jobs:
+  verify-dist:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: ./openclaw-plugin
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Rebuild dist
+        run: npm run build
+
+      - name: Fail if committed dist is stale
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "::error::Committed openclaw-plugin/dist is out of sync with src. Run 'npm run build' and commit the result."
+            git --no-pager diff --stat -- dist
+            exit 1
+          fi
+
+      - name: Run plugin tests
+        run: npm test
+
   dry-run:
     if: github.event_name == 'pull_request'
     permissions:
       contents: read
       id-token: write
-    uses: openclaw/clawhub/.github/workflows/package-publish.yml@v0.12.0
+    # Pinned to the v0.12.0 commit SHA (mutable tags can be re-pointed at malicious code).
+    uses: openclaw/clawhub/.github/workflows/package-publish.yml@ecf09b868a986751137f4272283f84967a16c765
     with:
       source: ./openclaw-plugin
       owner: jinyangwang27
@@ -24,7 +57,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: openclaw/clawhub/.github/workflows/package-publish.yml@v0.12.0
+    # Pinned to the v0.12.0 commit SHA (mutable tags can be re-pointed at malicious code).
+    uses: openclaw/clawhub/.github/workflows/package-publish.yml@ecf09b868a986751137f4272283f84967a16c765
     with:
       source: ./openclaw-plugin
       owner: jinyangwang27
