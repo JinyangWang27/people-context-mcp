@@ -13,8 +13,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: astral-sh/setup-uv@v6
       - run: uv sync --all-extras
       - run: uv run ruff check .
-      - run: uv run pytest -q
+      - name: Run tests with coverage
+        run: uv run --with pytest-cov pytest --cov=people_context --cov-report=xml -q
+      - name: Upload coverage to Codecov
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        uses: codecov/codecov-action@v6
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
+          token: ${{ secrets.CODECOV_TOKEN }}
