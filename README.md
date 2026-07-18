@@ -1,5 +1,7 @@
 # people-context-mcp
 
+[![codecov](https://codecov.io/gh/JinyangWang27/people-context-mcp/graph/badge.svg)](https://codecov.io/gh/JinyangWang27/people-context-mcp)
+
 A local-first [MCP](https://modelcontextprotocol.io) server that gives AI coding agents and personal agent
 systems durable, user-owned context about the people they mention.
 
@@ -36,8 +38,17 @@ envelope, and M6 sync capture remain compatible.
 
 Requires Python 3.11+ and [`uv`](https://docs.astral.sh/uv/).
 
+Install the published package:
+
 ```bash
-git clone <this-repo>
+uv tool install people-context-mcp
+people-context-mcp
+```
+
+For local development:
+
+```bash
+git clone https://github.com/JinyangWang27/people-context-mcp.git
 cd people-context-mcp
 uv sync
 uv run people-context-mcp
@@ -166,6 +177,7 @@ writing live in adapters. One composition root wires both stdio and HTTP.
 | [docs/mcp-interface.md](docs/mcp-interface.md) | MCP tools and stable response contracts |
 | [docs/cli.md](docs/cli.md) | CLI commands and DB resolution |
 | [docs/design/sync.md](docs/design/sync.md) | Sync design and M6 local foundations |
+| [docs/releasing.md](docs/releasing.md) | PyPI trusted publishing, Codecov, and release procedure |
 | [docs/privacy-and-safety.md](docs/privacy-and-safety.md) | Disclosure, audit, forget, threat model |
 | [docs/roadmap.md](docs/roadmap.md) | M0 through M7 |
 
