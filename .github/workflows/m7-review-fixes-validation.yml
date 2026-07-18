@@ -171,7 +171,25 @@ jobs:
             tests/adapters/test_vault_export.py \
             tests/adapters/test_m7_review_regressions.py
       - run: uv run ruff check .
-      - run: uv run pytest -q
+      - name: Capture pytest output
+        shell: bash
+        run: |
+          set +e
+          uv run pytest -q --tb=short > pytest.txt 2>&1
+          echo $? > pytest.exit
+          exit 0
+      - name: Upload pytest output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m7-review-pytest
+          path: |
+            pytest.txt
+            pytest.exit
+      - name: Enforce pytest result
+        run: |
+          cat pytest.txt
+          test "$(cat pytest.exit)" = "0"
       - name: Commit validated fixes
         shell: bash
         run: |
