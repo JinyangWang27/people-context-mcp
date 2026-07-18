@@ -2,9 +2,28 @@
 name = "people-context-mcp"
 version = "0.1.0"
 description = "Local-first MCP server giving AI agents contextual knowledge about the people in your life"
+readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+authors = [{ name = "Jinyang Wang" }]
+keywords = ["ai-agents", "local-first", "mcp", "model-context-protocol", "personal-context"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = ["mcp>=1.2", "pydantic>=2.7", "python-ulid>=2.2"]
+
+[project.urls]
+Homepage = "https://github.com/JinyangWang27/people-context-mcp"
+Repository = "https://github.com/JinyangWang27/people-context-mcp"
+Issues = "https://github.com/JinyangWang27/people-context-mcp/issues"
 
 [project.optional-dependencies]
 semantic = [
