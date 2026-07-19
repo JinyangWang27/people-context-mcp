@@ -1,17 +1,15 @@
-name: Apply PyPI distribution migration
+name: Finalize PyPI distribution migration
 
 on:
   push:
-    branches:
-      - claude/project-adoption-paths-426qn6
-    paths:
-      - .github/workflows/apply-pypi-migration.yml
+    branches: [claude/project-adoption-paths-426qn6]
+    paths: [.github/workflows/apply-pypi-migration.yml]
 
 permissions:
   contents: write
 
 jobs:
-  migrate:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout pull request branch
@@ -22,399 +20,53 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
-      - name: Apply migration edits
-        shell: python
+      - name: Update remaining project-name references
         run: |
+          python - <<'PY'
           from pathlib import Path
-
-          def replace(path: str, old: str, new: str, *, count: int | None = None) -> None:
-              file = Path(path)
-              text = file.read_text(encoding="utf-8")
-              actual = text.count(old)
-              if actual == 0:
-                  raise SystemExit(f"Expected text not found in {path}: {old!r}")
-              if count is not None and actual != count:
-                  raise SystemExit(f"Expected {count} occurrence(s) in {path}, found {actual}: {old!r}")
-              file.write_text(text.replace(old, new), encoding="utf-8")
-
-          replace('pyproject.toml', 'name = "people-context-mcp"', 'name = "people-context"', count=1)
-          replace(
-              'src/people_context/__init__.py',
-              '"""people-context-mcp: local-first contextual knowledge about the people in your life."""',
-              '"""people-context: local-first contextual knowledge about the people in your life."""',
-              count=1,
-          )
-          replace(
-              'src/people_context/adapters/sqlite/migrations/001_initial.sql',
-              '-- Initial schema for people-context-mcp.',
-              '-- Initial schema for people-context.',
-              count=1,
-          )
-
-          readme = Path('README.md')
-          text = readme.read_text(encoding='utf-8')
-          text = text.replace('https://img.shields.io/pypi/v/people-context-mcp', 'https://img.shields.io/pypi/v/people-context')
-          text = text.replace('https://img.shields.io/pypi/dm/people-context-mcp', 'https://img.shields.io/pypi/dm/people-context')
-          text = text.replace('https://img.shields.io/pypi/pyversions/people-context-mcp', 'https://img.shields.io/pypi/pyversions/people-context')
-          text = text.replace('https://pypi.org/project/people-context-mcp/', 'https://pypi.org/project/people-context/')
-          text = text.replace(
-              'Install the published package:\n\n```bash\nuv tool install people-context-mcp\npeople-context-mcp\n```',
-              'Install the published distribution, then start either the MCP server or the human-operated CLI:\n\n'
-              '```bash\nuv tool install people-context\npeople-context-mcp\npeople-context --help\n```\n\n'
-              'For a one-off server launch without a persistent installation:\n\n'
-              '```bash\nuvx --from people-context people-context-mcp\n```\n\n'
-              '> **PyPI migration:** the distribution was renamed from `people-context-mcp` to `people-context`. '
-              'The `people-context-mcp` console command remains stable. A legacy `people-context-mcp` distribution '
-              'is retained as a compatibility shim that depends on `people-context`; new installations should use '
-              '`people-context` directly.'
-          )
-          text = text.replace(
-              'claude mcp add people-context -- uv run --directory /path/to/people-context people-context-mcp',
-              'claude mcp add people-context -- uvx --from people-context people-context-mcp'
-          )
-          text = text.replace(
-              '"command": "uv",\n      "args": ["run", "--directory", "<repo>", "people-context-mcp"]',
-              '"command": "uvx",\n      "args": ["--from", "people-context", "people-context-mcp"]'
-          )
-          readme.write_text(text, encoding='utf-8')
-
-          simple_product_replacements = {
-              'docs/architecture.md': ('`people-context-mcp` is built', '`people-context` is built'),
-              'docs/communication-guidance.md': ('how `people-context-mcp` supports', 'how `people-context` supports'),
-              'docs/import.md': ('into `people-context-mcp` without', 'into `people-context` without'),
-              'docs/privacy-and-safety.md': ('`people-context-mcp` stores', '`people-context` stores'),
-              'docs/decisions/0001-python.md': ('`people-context-mcp` needs', '`people-context` needs'),
-              'openclaw-plugin/README.md': ('[`people-context-mcp`](https://github.com/JinyangWang27/people-context)', '[`people-context`](https://github.com/JinyangWang27/people-context)'),
+          changes = {
+              "src/people_context/adapters/sqlite/migrations/001_initial.sql": [("-- Initial schema for people-context-mcp.", "-- Initial schema for people-context.")],
+              "docs/architecture.md": [("`people-context-mcp` is built", "`people-context` is built")],
+              "docs/communication-guidance.md": [("how `people-context-mcp` supports", "how `people-context` supports")],
+              "docs/import.md": [("into `people-context-mcp` without", "into `people-context` without")],
+              "docs/privacy-and-safety.md": [("`people-context-mcp` stores", "`people-context` stores")],
+              "docs/decisions/0001-python.md": [("`people-context-mcp` needs", "`people-context` needs"), ("`uvx people-context-mcp` once published", "`uvx --from people-context people-context-mcp` from PyPI")],
+              "openclaw-plugin/README.md": [("[`people-context-mcp`](https://github.com/JinyangWang27/people-context)", "[`people-context`](https://github.com/JinyangWang27/people-context)")],
           }
-          for path, (old, new) in simple_product_replacements.items():
-              replace(path, old, new, count=1)
+          for filename, replacements in changes.items():
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              for old, new in replacements:
+                  if old not in text:
+                      raise SystemExit(f"missing expected text in {filename}: {old}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+          for filename in ("docs/roadmap.md", "docs/specs/m8-distribution-and-reach.md"):
+              path = Path(filename)
+              text = path.read_text(encoding="utf-8")
+              text = text.replace("`uvx people-context-mcp`", "`uvx --from people-context people-context-mcp`")
+              text = text.replace("package identifier\n`people-context-mcp`", "package identifier\n`people-context`")
+              path.write_text(text, encoding="utf-8")
+          PY
 
-          replace(
-              'docs/decisions/0001-python.md',
-              'clients launch it via `uv run people-context-mcp` (or `uvx people-context-mcp` once published).',
-              'clients launch it from a checkout via `uv run people-context-mcp`, or from PyPI via '
-              '`uvx --from people-context people-context-mcp`.',
-              count=1,
-          )
-
-          for path in ('docs/roadmap.md', 'docs/specs/m8-distribution-and-reach.md'):
-              file = Path(path)
-              text = file.read_text(encoding='utf-8')
-              text = text.replace('`uvx people-context-mcp`', '`uvx --from people-context people-context-mcp`')
-              text = text.replace('package identifier\n`people-context-mcp`', 'package identifier\n`people-context`')
-              text = text.replace('targeting the `uvx people-context-mcp` invocation', 'targeting the `uvx --from people-context people-context-mcp` invocation')
-              text = text.replace('all using the same `uvx people-context-mcp` command', 'all using the same `uvx --from people-context people-context-mcp` command')
-              file.write_text(text, encoding='utf-8')
-
-          Path('docs/releasing.md').write_text('''# Releasing, PyPI migration, and coverage
-
-## One-time repository setup
-
-### Codecov
-
-Codecov uploads use GitHub OIDC through `codecov/codecov-action`; no long-lived `CODECOV_TOKEN` secret is
-required. Ensure the Codecov GitHub App has access to `JinyangWang27/people-context` after the repository rename.
-The CI workflow generates `coverage.xml` and uploads it on pushes and same-repository pull requests. Fork pull
-requests still run the tests but skip the upload because they do not receive a trusted OIDC context for this
-repository.
-
-### PyPI trusted publishing
-
-PyPI project names cannot be renamed. The primary distribution is therefore published as the new project
-`people-context`, while the former `people-context-mcp` project receives a small compatibility distribution.
-Both projects use Trusted Publishing, so no long-lived PyPI API token is stored in GitHub.
-
-Configure the primary `people-context` project (or a pending publisher before its first release) with:
-
-| Field | Value |
-|---|---|
-| PyPI project name | `people-context` |
-| GitHub owner | `JinyangWang27` |
-| GitHub repository | `people-context` |
-| Workflow filename | `release.yml` |
-| Environment name | `pypi` |
-
-Keep the legacy `people-context-mcp` project's trusted publisher configured with the same GitHub owner,
-repository, workflow filename, and environment. Its final compatibility wheel is built from
-`compat/people-context-mcp/` and depends on `people-context>=0.1.0`. It also declares the established
-`people-context-mcp` server and `people-context` CLI entry points, which keeps `pip`, `pipx`, and `uv tool`
-installations under the old distribution name functional while directing resolution to the new package.
-
-Create a GitHub Actions environment named `pypi`. Requiring approval and limiting deployments to release tags is
-recommended. The first successful trusted publication creates `people-context` if the name is still available.
-
-## Distribution and command names
-
-- PyPI distribution: `people-context`.
-- Python import package: `people_context` (unchanged).
-- MCP server executable: `people-context-mcp` (unchanged for client compatibility).
-- Human-operated CLI executable: `people-context` (unchanged).
-- Legacy PyPI distribution: `people-context-mcp`, compatibility-only; do not add new implementation code there.
-
-New users should install `people-context`. Existing users may continue to resolve the old distribution, but
-project documentation and integrations must use the new distribution name.
-
-## Publish a release
-
-1. Update `project.version` in `pyproject.toml` and merge the change to `main`.
-2. Create a GitHub Release from that commit using a matching tag such as `v0.1.0`.
-3. Publish the GitHub Release.
-4. Approve the `pypi` environment deployments when prompted.
-
-`.github/workflows/release.yml` then:
-
-1. verifies that `uv.lock` matches `pyproject.toml`;
-2. builds and checks the `people-context` wheel and source distribution;
-3. builds and checks the legacy `people-context-mcp` compatibility wheel and source distribution;
-4. publishes the primary artifacts to the `people-context` PyPI project using short-lived OIDC credentials; and
-5. publishes the compatibility artifacts to `people-context-mcp` with `skip-existing`, so the fixed migration
-   release is uploaded once and harmlessly skipped on later releases.
-
-PyPI release filenames and versions are immutable. If a primary upload partially succeeds, publish a new version
-rather than attempting to overwrite existing files. Never delete the legacy project: it reserves the old name and
-provides a safe upgrade path.
-''', encoding='utf-8')
-
-          Path('.github/workflows/release.yml').write_text('''name: Publish to PyPI
-
-on:
-  release:
-    types:
-      - published
-
-permissions: read-all
-
-jobs:
-  build:
-    name: Build distributions
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
-
-      - name: Verify lockfile
-        run: uv lock --check
-
-      - name: Build primary distribution
-        run: uv build
-
-      - name: Build legacy compatibility distribution
+      - name: Regenerate lockfile and validate
         run: |
-          cd compat/people-context-mcp
-          uv build --out-dir "$GITHUB_WORKSPACE/dist-legacy"
-
-      - name: Verify distribution metadata
-        run: uvx --from twine==6.2.0 twine check dist/* dist-legacy/*
-
-      - name: Store primary distributions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: python-package-distributions
-          path: dist/
-          if-no-files-found: error
-
-      - name: Store legacy compatibility distributions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: python-legacy-compat-distributions
-          path: dist-legacy/
-          if-no-files-found: error
-
-  publish:
-    name: Publish people-context
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/people-context
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Download primary distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: python-package-distributions
-          path: dist/
-
-      - name: Publish primary distribution
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
-
-  publish-legacy:
-    name: Publish people-context-mcp compatibility package
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/people-context-mcp
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Download legacy compatibility distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: python-legacy-compat-distributions
-          path: dist/
-
-      - name: Publish compatibility distribution once
-        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
-        with:
-          skip-existing: true
-''', encoding='utf-8')
-
-          ci = Path('.github/workflows/ci.yml')
-          text = ci.read_text(encoding='utf-8')
-          marker = '''      - name: Run Ruff
-        run: uv run --locked ruff check .
-
-'''
-          addition = '''      - name: Verify package distributions
-        run: |
-          uv lock --check
-          uv build
-          (cd compat/people-context-mcp && uv build --out-dir "$GITHUB_WORKSPACE/dist-legacy")
-          uvx --from twine==6.2.0 twine check dist/* dist-legacy/*
-
-'''
-          if addition not in text:
-              if marker not in text:
-                  raise SystemExit('CI insertion marker not found')
-              text = text.replace(marker, marker + addition)
-          ci.write_text(text, encoding='utf-8')
-
-          compat = Path('compat/people-context-mcp')
-          (compat / 'src/people_context_mcp_compat').mkdir(parents=True, exist_ok=True)
-          (compat / 'pyproject.toml').write_text('''[project]
-name = "people-context-mcp"
-version = "0.1.0.post1"
-description = "Compatibility package for the renamed people-context distribution"
-readme = "README.md"
-requires-python = ">=3.11"
-license = "MIT"
-authors = [{ name = "Jinyang Wang", email = "jinyang.wang27@outlook.com" }]
-dependencies = ["people-context>=0.1.0"]
-classifiers = [
-    "Development Status :: 7 - Inactive",
-    "Environment :: Console",
-    "Intended Audience :: Developers",
-    "Programming Language :: Python :: 3",
-]
-
-[project.urls]
-Homepage = "https://github.com/JinyangWang27/people-context"
-Repository = "https://github.com/JinyangWang27/people-context"
-Issues = "https://github.com/JinyangWang27/people-context/issues"
-
-[project.scripts]
-people-context-mcp = "people_context.adapters.mcp.server:main"
-people-context = "people_context.cli:main"
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/people_context_mcp_compat"]
-''', encoding='utf-8')
-          (compat / 'README.md').write_text('''# people-context-mcp compatibility package
-
-The project and primary PyPI distribution have moved to [`people-context`](https://pypi.org/project/people-context/).
-
-Install the new distribution directly:
-
-```bash
-pip install people-context
-# or
-uv tool install people-context
-```
-
-This compatibility package depends on `people-context` and preserves the established `people-context-mcp` MCP
-server executable and `people-context` CLI executable. It contains no application implementation of its own.
-''', encoding='utf-8')
-          (compat / 'src/people_context_mcp_compat/__init__.py').write_text(
-              '"""Compatibility marker for the former people-context-mcp distribution."""\n',
-              encoding='utf-8',
-          )
-
-          Path('tests/test_packaging_metadata.py').write_text('''from __future__ import annotations
-
-import tomllib
-from pathlib import Path
-
-
-ROOT = Path(__file__).parents[1]
-
-
-def _toml(path: Path) -> dict:
-    with path.open("rb") as stream:
-        return tomllib.load(stream)
-
-
-def test_primary_distribution_uses_new_name_and_stable_entrypoints() -> None:
-    project = _toml(ROOT / "pyproject.toml")["project"]
-
-    assert project["name"] == "people-context"
-    assert project["scripts"] == {
-        "people-context-mcp": "people_context.adapters.mcp.server:main",
-        "people-context": "people_context.cli:main",
-    }
-
-
-def test_legacy_distribution_is_dependency_only_compatibility_package() -> None:
-    project = _toml(ROOT / "compat/people-context-mcp/pyproject.toml")["project"]
-
-    assert project["name"] == "people-context-mcp"
-    assert project["dependencies"] == ["people-context>=0.1.0"]
-    assert project["scripts"]["people-context-mcp"] == "people_context.adapters.mcp.server:main"
-    assert project["scripts"]["people-context"] == "people_context.cli:main"
-
-
-def test_release_workflow_targets_primary_and_legacy_projects() -> None:
-    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
-
-    assert "https://pypi.org/p/people-context\n" in workflow
-    assert "https://pypi.org/p/people-context-mcp\n" in workflow
-    assert "skip-existing: true" in workflow
-''', encoding='utf-8')
-
-      - name: Refresh lockfile
-        run: uv lock
-
-      - name: Install all dependencies
-        run: uv sync --locked --all-extras
-
-      - name: Run Ruff
-        run: uv run --locked ruff check .
-
-      - name: Run complete test suite
-        run: uv run --locked pytest -q
-
-      - name: Smoke-test entry points and distributions
-        run: |
+          uv lock
+          uv sync --locked --all-extras
+          uv run --locked ruff check .
+          uv run --locked pytest -q
           uv run --locked people-context-mcp --help
           uv run --locked people-context --help
           uv build
           (cd compat/people-context-mcp && uv build --out-dir "$GITHUB_WORKSPACE/dist-legacy")
           uvx --from twine==6.2.0 twine check dist/* dist-legacy/*
+          ! grep -R "JinyangWang27/people-context-mcp" --exclude-dir=.git .
 
-      - name: Check obsolete repository URLs
-        run: |
-          if grep -R "JinyangWang27/people-context-mcp" --exclude-dir=.git .; then
-            echo "::error::Found obsolete repository URL"
-            exit 1
-          fi
-
-      - name: Commit migration
+      - name: Commit validated migration
         run: |
           git rm .github/workflows/apply-pypi-migration.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "build: migrate PyPI distribution to people-context"
+          git commit -m "build: complete PyPI migration to people-context"
           git push origin HEAD:claude/project-adoption-paths-426qn6
