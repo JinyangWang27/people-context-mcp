@@ -19,7 +19,7 @@ Create a pending trusted publisher on PyPI with these values:
 |---|---|
 | PyPI project name | `people-context-mcp` |
 | GitHub owner | `JinyangWang27` |
-| GitHub repository | `people-context-mcp` |
+| GitHub repository | `people-context` (renamed from `people-context-mcp`; the PyPI project name is unchanged) |
 | Workflow filename | `release.yml` |
 | Environment name | `pypi` |
 

@@ -1,19 +1,19 @@
-# people-context-mcp
+# people-context
 
-[![CI](https://github.com/JinyangWang27/people-context-mcp/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JinyangWang27/people-context-mcp/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/JinyangWang27/people-context-mcp/graph/badge.svg)](https://codecov.io/gh/JinyangWang27/people-context-mcp)
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JinyangWang27/people-context-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/JinyangWang27/people-context-mcp)
+[![CI](https://github.com/JinyangWang27/people-context/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/JinyangWang27/people-context/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/JinyangWang27/people-context/graph/badge.svg)](https://codecov.io/gh/JinyangWang27/people-context)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/JinyangWang27/people-context/badge)](https://scorecard.dev/viewer/?uri=github.com/JinyangWang27/people-context)
 [![PyPI](https://img.shields.io/pypi/v/people-context-mcp)](https://pypi.org/project/people-context-mcp/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/people-context-mcp)](https://pypi.org/project/people-context-mcp/)
 [![Python](https://img.shields.io/pypi/pyversions/people-context-mcp)](https://pypi.org/project/people-context-mcp/)
-[![License](https://img.shields.io/github/license/JinyangWang27/people-context-mcp)](https://github.com/JinyangWang27/people-context-mcp/blob/main/LICENSE)
+[![License](https://img.shields.io/github/license/JinyangWang27/people-context)](https://github.com/JinyangWang27/people-context/blob/main/LICENSE)
 
 A local-first [MCP](https://modelcontextprotocol.io) server that gives AI coding agents and personal agent
 systems durable, user-owned context about the people they mention.
 
 ## Why
 
-A model can recognize a name but does not know who that person is in the user's life. `people-context-mcp`
+A model can recognize a name but does not know who that person is in the user's life. `people-context`
 keeps identity, aliases, relationships, roles, durable facts, concise interactions, communication preferences,
 and follow-ups in a local SQLite file, then exposes narrow tools that resolve identity and disclose only what a
 request needs.
@@ -56,8 +56,8 @@ people-context-mcp
 For local development:
 
 ```bash
-git clone https://github.com/JinyangWang27/people-context-mcp.git
-cd people-context-mcp
+git clone https://github.com/JinyangWang27/people-context.git
+cd people-context
 uv sync
 uv run people-context-mcp
 ```
@@ -89,7 +89,7 @@ Re-export is byte-deterministic over unchanged data. Sensitive/restricted facts 
 Claude Code:
 
 ```bash
-claude mcp add people-context -- uv run --directory /path/to/people-context-mcp people-context-mcp
+claude mcp add people-context -- uv run --directory /path/to/people-context people-context-mcp
 ```
 
 Generic stdio configuration:
