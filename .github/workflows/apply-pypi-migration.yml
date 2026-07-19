@@ -44,7 +44,9 @@ jobs:
         run: uv lock
       - name: Install dependencies
         run: uv sync --locked --all-extras
-      - name: Ruff
+      - name: Ruff auto-fix
+        run: uv run --locked ruff check . --fix
+      - name: Ruff recheck
         run: uv run --locked ruff check .
       - name: Tests
         run: uv run --locked pytest -q
