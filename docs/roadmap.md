@@ -195,6 +195,66 @@ encryption and a stated threat-model comparison against cloud memory tools.
 
 **Status:** Planned.
 
+## M13 — Daily utility & proactive signals
+
+**Goals:** give the store humane, daily reasons to be consulted beyond agent Q&A — recency signals, date
+awareness, meeting preparation, and reminders that surface in tools people already check. Every deliverable is
+a read path over data the schema already holds; nothing new is recorded.
+
+**Deliverables:**
+
+- read-only `get_stale_relationships` MCP tool and `people-context stale` CLI report: per-person
+  latest-interaction recency, filterable by relationship category, with explicit caps and a `truncated` flag
+  following the M7 graph-tool conventions;
+- read-only `upcoming_dates` MCP tool and CLI report over parseable birthday/date facts and due reminders
+  within a bounded window;
+- a meeting-preparation flow in the M10 skill composing M9 `.ics` attendee resolution with
+  `get_person_context`, `get_communication_guidance`, and open reminders — plugin-side only, no new server
+  tool;
+- `people-context reminders-ics --output FILE`: CLI-only deterministic iCalendar export of reminders, using
+  the export file-permission conventions;
+- `people-context watch`: CLI-only JSON-lines tail of the changelog for local automation, cursored on the
+  changelog's deterministic HLC ordering key.
+
+**Status:** Planned.
+
+## M14 — Ecosystem & interoperability
+
+**Goals:** meet adjacent tool ecosystems where their users already are: portable person briefs for any chat
+surface, two-way vCard portability, more import funnels, and a first-class Obsidian experience beyond one-shot
+vault export.
+
+**Deliverables:**
+
+- `people-context brief PERSON [--include-sensitive]`: CLI-only compact markdown person brief for pasting into
+  any assistant, disclosure-gated with the same explicit sensitivity opt-in as vault export;
+- `people-context export-vcard`: deterministic vCard export complementing the existing importer (CardDAV stays
+  unscheduled);
+- two additional import sources through the M9 router: Outlook/Exchange contacts CSV, and WhatsApp chat-export
+  participants/dates (participants and timestamps only — message bodies are never parsed into candidates);
+- an Obsidian community plugin (TypeScript package following the `openclaw-plugin/` precedent) rendering live,
+  read-only people pages from the local database.
+
+**Status:** Planned.
+
+## M15 — Data quality, insight, and credibility
+
+**Goals:** keep long-lived databases trustworthy, make the privacy story inspectable, and give the project
+publishable evidence and narratives.
+
+**Deliverables:**
+
+- `people-context doctor`: report-only curation findings — likely duplicate people, contradictory facts,
+  dangling references — with suggested `merge_people`/`correct_record` follow-ups, never auto-applied;
+- `people-context stats`: local counts, sensitivity distribution, audit/changelog summaries, and a disclosure
+  gate inventory;
+- transliteration-aware resolution polish: the existing `native_script`/`transliteration` alias kinds become
+  first-class in resolution ranking and explanations, with documented bilingual alias workflows;
+- a published evaluation comparing agent task quality with and without the server, plus a use-case gallery in
+  docs.
+
+**Status:** Planned.
+
 ## Post-roadmap candidates
 
 The following remain candidates, not commitments:
@@ -203,8 +263,9 @@ The following remain candidates, not commitments:
   (M11 covers only bundle export and empty-database bootstrap restore);
 - multi-user ownership and sharing;
 - authenticated remote transport;
-- reminder notification daemon;
-- read-only local viewer (`people-context browse`);
-- vCard export and CardDAV, complementing the existing vCard import.
+- reminder notification daemon (M13 ships only a pull-based calendar-feed export);
+- read-only local web viewer (`people-context browse`; M14's Obsidian plugin covers browsing for Obsidian
+  users);
+- CardDAV synchronization (M14 ships only one-way vCard export).
 
-See `docs/specs/` for one implementation spec per M8–M12 milestone.
+See `docs/specs/` for one implementation spec per M8–M15 milestone.
