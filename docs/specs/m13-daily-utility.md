@@ -29,8 +29,11 @@ Non-goals:
 
 ### `get_stale_relationships` / `people-context stale`
 
-Add `ports/insights.py::RecencyReader`, its SQLite implementation, and an app use case that applies policy and
-caps. The adapter returns one row per active, non-deleted person with:
+Add `ports/insights.py::RecencyReader`, its SQLite implementation, and
+`GetStaleRelationships(RecencyReader, Clock)`. The adapter returns stored aggregate signal only; the app use case
+uses `clock.now()` for deterministic age/threshold policy and applies caps.
+
+One row per active, non-deleted person contains:
 
 - every active relationship-to-self category, deduplicated and stably ordered;
 - latest ordinary-disclosure interaction timestamp;
@@ -40,7 +43,18 @@ Only `public`/`personal` interactions participate. A person whose interactions a
 looks identical to one with none: `last_interaction_at: null`, count zero. This prevents an ordinary tool from
 leaking elevated interaction timing.
 
-Parameters: optional canonical `category`, `threshold_days=90`, and `limit` capped at 100. The result is:
+Parameters and policy:
+
+- optional canonical `category` filter;
+- `threshold_days` validated in `0..36500`, default 90;
+- `limit` validated in `1..100`, default documented by the tool;
+- include a person when ordinary `last_interaction_at` is null or signed calendar `days_since >= threshold_days`;
+- compute signed `days_since = (clock.now().date() - last_interaction_at.date()).days`; future timestamps are not
+  stale and are not silently clamped;
+- sort null interaction first, then oldest interaction, normalized name, and id;
+- apply limit after filtering/sorting and set `truncated` when additional qualifying rows exist.
+
+The result is:
 
 ```json
 {
@@ -56,7 +70,6 @@ Parameters: optional canonical `category`, `threshold_days=90`, and `limit` capp
 }
 ```
 
-People with no ordinary interactions sort first, followed by oldest interaction, normalized name, and id.
 No summaries or other content are returned.
 
 ### `upcoming_dates` / CLI report
@@ -92,11 +105,11 @@ Serialize one `VTODO` for each active reminder whose `due_at` and `created_at` a
 - stable order `(due_at, id)` and canonical CRLF/folding rules.
 
 The current `SetReminderInput`/`Reminder` models accept ordinary Python `datetime` values without enforcing a
- timezone, and M13 is a read/export milestone rather than a breaking write-contract change. Therefore do not guess
- a local timezone for legacy/current naïve rows. Count and omit:
+timezone, and M13 is a read/export milestone rather than a breaking write-contract change. Therefore do not guess
+a local timezone for legacy/current naïve rows. Count and omit:
 
 - `skipped_undated` when `due_at is None`;
-- `skipped_naive_datetime` when either `due_at` or `created_at` lacks `tzinfo`/UTC offset.
+- `skipped_naive_datetime` when either `due_at` or `created_at` lacks `tzinfo` or a UTC offset.
 
 Map recurrence only for exact values `yearly`, `monthly`, and `weekly`. A valid exported reminder with any other
 non-empty recurrence value is still emitted as one dated occurrence, but its unsupported `RRULE` is omitted and
@@ -112,11 +125,13 @@ Add additive `Changelog.list_entries_after(cursor, limit)` returning rows strict
 cursor `(hlc_physical_ms, hlc_logical, device_id, op_id)` in ascending order. Existing descending
 `list_entries` remains unchanged.
 
-Startup semantics are explicit:
+Startup/polling semantics are explicit:
 
+- `--interval` is validated in `0.1..3600` seconds;
+- use a fixed documented batch size in `1..1000` so one poll is bounded;
 - without `--from-start`, read the current latest entry once and set it as the initial cursor without emitting
   existing history; only later entries are printed;
-- with `--from-start`, start before the minimum key and replay all existing entries;
+- with `--from-start`, start before the minimum key and replay all existing entries batch by batch;
 - after each emitted batch, advance the cursor to the final emitted entry;
 - an empty poll does not alter the cursor.
 
@@ -156,20 +171,20 @@ uv run people-context watch [--interval SECONDS] [--from-start]
 
 ## Testing strategy
 
-- App fake-port tests for recency thresholds, caps, stable category aggregation, zero-interaction ordering, and
-  sensitivity filtering.
-- Date tests for both inclusive boundaries, just-outside values, both birthday formats, year rollover, leap-day
+- Fake-reader/clock tests pin threshold boundaries, signed future timestamps, caps/truncation, stable category
+  aggregation, null-interaction ordering, and sensitivity filtering.
+- Date tests cover both inclusive boundaries, just-outside values, both birthday formats, year rollover, leap-day
   behavior, missing/deleted people, and sensitive/unparseable non-disclosure.
 - SQLite tests prove recency sensitivity filtering occurs in SQL and cursor comparison handles cross-device HLC
   ties.
-- MCP tests pin shapes and read-only annotations; CLI snapshots pin human and JSON output.
+- MCP tests pin shapes, numeric validation, and read-only annotations; CLI snapshots pin human and JSON output.
 - iCalendar tests cover escaping/folding, UTC conversion, all supported recurrence mappings, `skipped_undated`,
   `skipped_naive_datetime`, `recurrence_omitted`, and byte-identical repeated export. Include aware non-UTC offsets,
   naïve `due_at`, and naïve `created_at`; no output event may be produced for the naïve cases.
 - Private-file tests pre-create a `0o644` destination, overwrite it, and assert `0o600` on POSIX; symlink and failed
   replacement cases reuse the M11 helper tests.
-- Watch tests cover initial latest-cursor behavior, `--from-start`, empty polls, multi-batch cursor advancement,
-  and one deterministic poll without a long-running subprocess.
+- Watch tests cover interval validation, bounded batches, initial latest-cursor behavior, `--from-start`, empty
+  polls, multi-batch cursor advancement, and one deterministic poll without a long-running subprocess.
 - `uv run ruff check .` and `uv run pytest -q` fully green.
 
 ## Open questions
