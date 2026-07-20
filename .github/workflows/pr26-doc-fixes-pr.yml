@@ -18,19 +18,8 @@ jobs:
           ref: claude/m7-graph-and-vault-6vdtgf
           fetch-depth: 0
 
-      - name: Run the fail-closed repair script
-        shell: bash
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          workflow = Path('.github/workflows/pr26-third-review-fixes.yml').read_text(encoding='utf-8')
-          marker = "          python - <<'PY'\n"
-          terminator = "\n          PY\n"
-          body = workflow.split(marker, 1)[1].split(terminator, 1)[0]
-          script = '\n'.join(line[10:] if line.startswith('          ') else line for line in body.splitlines())
-          exec(compile(script, 'pr26-third-review-fixes.py', 'exec'))
-          PY
+      - name: Apply fail-closed corrections
+        run: python .github/pr26-fix.py
 
       - uses: astral-sh/setup-uv@v6
 
@@ -44,7 +33,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git rm .github/workflows/pr26-third-review-fixes.yml .github/workflows/pr26-doc-fixes-pr.yml .github/pr26-third-review-trigger
+          git rm .github/pr26-fix.py .github/pr26-third-review-trigger .github/workflows/pr26-third-review-fixes.yml .github/workflows/pr26-doc-fixes-pr.yml
           git add docs/specs/pr-plan.md docs/specs/m9-cold-start-and-onboarding.md docs/specs/m11-sync-bundle-and-bootstrap-restore.md docs/specs/m12-trust-stability-v1.md docs/specs/m13-daily-utility.md docs/specs/m14-ecosystem-interop.md
           git commit -m "docs: address second PR 26 review"
           git push origin HEAD:claude/m7-graph-and-vault-6vdtgf
