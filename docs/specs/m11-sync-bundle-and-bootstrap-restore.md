@@ -128,18 +128,9 @@ point-in-time hand-off, not an incremental delta.
 
 ### New app-layer use cases
 
-`app/sync_bundle.py` (new module, following the existing one-use-case-per-module convention):
-
-- `ExportSyncBundle` — takes a `BundleReader` and returns a `SyncBundle` Pydantic model matching the envelope
-  above. This is a pure read, "a read-only changelog consumer like the existing sync-log CLI," per the source
-  analysis — no mutation; the single-transaction consistency guarantee lives in the adapter, not here.
-- `RestoreSyncBundle` — takes a new narrow port (below) that performs the emptiness verification and the
-  verbatim bulk write **inside one transaction**. The emptiness checks (no person rows, including soft-deleted
-  ones, and no changelog entries) must not run in the use case before delegating: with the CLI running beside a
-  live server, a check-then-write sequence spanning two transactions races — another process could write
-  between the check and the restore. The refusal surfaces as a structured error (mirroring
-  `ImportPipelineError`'s `code`/`message`/`details` shape used elsewhere in this codebase) when the target
-  already has primary data or changelog history.
+`ExportSyncBundle` takes a `BundleReader` and injected `Clock`. The reader supplies one consistent database
+snapshot; `clock.now()` supplies deterministic/testable `created_at`, matching `ExportData`. `RestoreSyncBundle`
+uses the narrow bootstrap-restorer port and delegates emptiness checks plus verbatim writes to one transaction.
 
 ### New port and adapter for verbatim bulk restore
 

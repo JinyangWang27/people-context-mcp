@@ -67,12 +67,11 @@ project's existing precise/contract-oriented voice:
 
 ### Version and release checklist
 
-Bump `project.version` in `pyproject.toml` to `1.0.0` and its classifier from `"Development Status :: 3 -
-Alpha"` to `"Development Status :: 5 - Production/Stable"`, following the exact release procedure already
-documented in [docs/releasing.md](../releasing.md#publish-a-release) (update version → merge → tag → GitHub
-Release → approve the `pypi` environment deployment). Add one checklist item specific to the first 1.0 release:
-confirm the compatibility-promise doc is published before the tag, since it is the artifact this version number
-is meant to back up.
+Bump the project and classifier to `1.0.0`/Production-Stable. In the same commit, synchronize the Registry PyPI
+package version in `server.json`, MCPB semantic `version`, and the `people-context` dependency pin in the bundled
+MCPB `pyproject.toml`. MCPB `manifest_version` is a schema-version field and remains independent. CI parses all
+artifacts and fails on semantic-version drift. Follow the existing release procedure and add the compatibility-doc
+checklist item; do not cut the tag in this PR.
 
 ### Opt-in SQLCipher
 
@@ -154,19 +153,11 @@ requires a new *connection-open path*, not new schema.
 
 ## Testing strategy
 
-- New adapter test module `tests/adapters/test_sqlite_encryption.py`: `open_encrypted_db` requires a key,
-  rejects an empty/missing key with a clear error, rejects the wrong key on a previously-encrypted file, and a
-  smoke check that a plain `sqlite3.connect()` (unkeyed) cannot read table contents from an encrypted file
-  produced by `open_encrypted_db` — this last check is the actual verification that encryption is doing
-  anything, not just that the code path runs.
-- Every existing adapter test continues to run unmodified against `open_db` — this milestone must not require
-  touching any of the roughly three dozen files under `tests/adapters/` that already call `open_db(":memory:")`
-  or `open_db(tmp_path / "...")`.
-- CLI test for `--encrypted` without `PEOPLE_CONTEXT_DB_KEY` set, asserting a clear refusal rather than a
-  silent plaintext fallback or an unhandled exception.
-- No new tests are needed for the compatibility-promise doc, version bump, threat-model section, or README
-  polish beyond a documentation link-check (every new cross-reference added to `README.md`'s docs table
-  resolves to a real file), consistent with this being a docs-only slice of the milestone.
+- Encryption adapter and CLI refusal tests remain as specified.
+- Existing plain-SQLite tests remain unchanged.
+- Add a distribution metadata test parsing `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and
+  `mcpb/pyproject.toml`; assert one semantic release version and treat `manifest_version` separately.
+- Documentation-only changes require link checks.
 
 ## Open questions
 

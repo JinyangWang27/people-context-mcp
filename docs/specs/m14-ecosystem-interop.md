@@ -98,7 +98,7 @@ Both are one extractor class plus a router branch, per the M9 pattern:
   `self_sender` hint, exposed additively by the existing `import_content` tool for WhatsApp labels that no stored
   alias can match (`"You"`, a bare phone number). WhatsApp excludes senders matching either signal from external
   `person` candidates and marks self-participation in the day's interaction, mirroring email's `self_addresses`
-  behavior. Regression tests exercise every pre-M14 source through `ImportContent` after the signature change.
+  behavior. Regression tests exercise every pre-M14 accepted source value (`email`, `mbox`, `vcard`, `ics`, and `linkedin`) through `ImportContent` after the signature change.
 
 Both stage through the unchanged `import_content` → `review_import` → `commit_import` gate.
 

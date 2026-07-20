@@ -90,16 +90,12 @@ minimal like graph nodes.
 
 ### `upcoming_dates` / CLI report
 
-App use case `app/list_upcoming_dates.py` over two existing reads: facts via the `ContextReader` port's
-`list_facts`, and reminders via the existing `ListReminders` use case (`app/list_reminders.py`). A fact
-qualifies only when its `sensitivity` passes the same ordinary `public`/`personal` boundary
-`get_person_context` applies — the fact's stored `value` *is* the date, so "only the date is disclosed" is
-not a mitigation, and a sensitive or restricted birthday fact must be entirely invisible to this ordinary
-tool — and when its `predicate` is date-like (initially exactly `birthday`) and its `value` parses as an ISO
-date or a recurring `--MM-DD` form; unparseable values are skipped and counted, never guessed. Reminders
-qualify when `status` is active and `due_at` falls inside the window. Parameters: `window_days` (default 30,
-capped at 366), optional `person_id`. Response lists `{person_id, name, kind: "birthday"|"reminder", date,
-label}` entries ordered by date, with a `skipped_unparseable` count.
+`ListUpcomingDates` depends on `ContextReader`, `ListReminders`, `PersonReader`, and an injected `Clock`. The clock
+anchors a documented inclusive date interval; person reads supply names and allow missing/soft-deleted people to
+be skipped deterministically. Facts must pass ordinary sensitivity, use predicate `birthday`, and parse as ISO or
+`--MM-DD`; active reminders qualify when `due_at` lies inside the same window. Tests pin both boundaries, recurring
+dates, leap day, and name lookup. Output remains `{person_id, name, kind, date, label}` plus
+`skipped_unparseable`.
 
 ### Meeting preparation (skill content, no server change)
 

@@ -109,20 +109,15 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
 
 > Give a freshly installed, empty database something to show in under a minute, and broaden the extract-and-stage import pipeline to the contact sources people actually export from.
 
-- [ ] **PR M9.1 — Relocate `ImportExtractorRouter` into its own adapter module**
-  - **Scope:** Pure refactor: move `ImportExtractorRouter` out of `src/people_context/adapters/vcard_import.py` into a new `src/people_context/adapters/import_router.py`, dispatching on explicit `source_type` match (raising `ImportExtractionError("invalid_source_type", ...)` for unrecognized types instead of silently defaulting to email). Update the one call site. No new source types yet — this just prepares the ground before a third/fourth extractor lands.
-  - **Touches:**
-    - `src/people_context/adapters/import_router.py` (new)
-    - `src/people_context/adapters/vcard_import.py` (remove `ImportExtractorRouter`, keep `VCardImportExtractor` + parsing helpers)
-    - `src/people_context/adapters/mcp/server.py` (update import at the router construction site, ~lines 51/233)
-    - `tests/adapters/test_import_router.py` (new)
-    - `tests/adapters/test_vcard_import.py` (update import path for `ImportExtractorRouter`)
+- [ ] **PR M9.1 — Relocate `ImportExtractorRouter` without dropping `mbox`**
+  - **Scope:** Move `ImportExtractorRouter` into `adapters/import_router.py` and replace fall-through dispatch with explicit accepted source values. Preserve all three values that exist before M9: `email` and `mbox` both route to `EmailImportExtractor`; `vcard` routes to `VCardImportExtractor`; unknown values raise `ImportExtractionError("invalid_source_type", ...)`.
+  - **Touches:** `adapters/import_router.py` (new), `adapters/vcard_import.py` (remove router only), `adapters/mcp/server.py` (import update), `tests/adapters/test_import_router.py` (new), and affected vCard/router tests.
   - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "Router relocation")
-    - Router must dispatch on explicit `source_type` match for all known types (`email`, `vcard`, and — added in later PRs — `ics`, `linkedin`); unknown types raise `ImportExtractionError("invalid_source_type", ...)` rather than silently falling through to email.
-    - `ImportContent`'s constructor is unaffected — it already takes an `ImportExtractor` by Protocol (`app/import_content.py:310`), not a concrete class, so this is adapter-only.
-    - `adapters/vcard_import.py` keeps only `VCardImportExtractor` and its parsing helpers after the move.
-  - **Tests/validation:** `uv run ruff check .` clean, `uv run pytest -q` fully green. New `tests/adapters/test_import_router.py` covering dispatch for `email` and `vcard` (the two types that exist at this point) plus the unknown-`source_type` error path; existing `test_vcard_import.py` router-dependent tests updated to import from the new module and must still pass unchanged in behavior.
-  - **Out of scope:** `.ics` and LinkedIn extractors themselves (PR M9.2/M9.3 add their router branches on top of this module).
+    - Dispatch by source value, not extractor count: `email`/`mbox` → email extractor; `vcard` → vCard extractor; later PRs add `ics` and `linkedin`.
+    - `mbox` is an existing public import mode; preserve its path-only validation, candidate output, and skip reporting.
+    - Unknown values fail closed with `invalid_source_type`; `ImportContent` remains Protocol-based.
+  - **Tests/validation:** Router tests cover `email`, `mbox`, `vcard`, and unknown values. Exercise `mbox` through `ImportContent` to pin its existing behavior. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** implementing ICS or LinkedIn extraction.
 
 - [ ] **PR M9.2 — `.ics` calendar-attendee import**
   - **Scope:** Add `IcsImportExtractor` implementing the `ImportExtractor` Protocol for `source_type="ics"`, staging one deduplicated `person` candidate per attendee email and one `interaction` candidate per event (`channel="calendar"`, fixed neutral summary, never the event `SUMMARY`/`DESCRIPTION`). Wire it into `import_router.py`. No CLI/MCP surface changes beyond accepting the existing free-string `source_type`.
@@ -143,41 +138,26 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
   - **Out of scope:** LinkedIn extractor (PR M9.3), `init`/`demo` CLI commands (PR M9.4), any shared line-folding module refactor beyond what's needed to avoid outright duplication (may be deferred to a follow-up cleanup if it risks bloating this PR past ~1,000 lines — note the decision explicitly).
 
 - [ ] **PR M9.3 — LinkedIn connections-export import**
-  - **Scope:** Add `LinkedInImportExtractor` implementing the `ImportExtractor` Protocol for `source_type="linkedin"`, parsing "Connections.csv" rows into `person`, optional `affiliation` (Company+Position), and optional `fact` (`predicate="linkedin_connected_on"`) candidates. Wire into `import_router.py`. The profile `URL` column is intentionally not staged.
-  - **Touches:**
-    - `src/people_context/adapters/linkedin_import.py` (new)
-    - `src/people_context/adapters/import_router.py` (add `"linkedin"` branch)
-    - `tests/adapters/test_linkedin_import.py` (new)
-    - `tests/adapters/test_import_router.py` (extend with `"linkedin"` case, now covering all four source types)
-    - `tests/adapters/test_mcp_server.py` (extend in-memory `import_content` test with `source_type="linkedin"`)
-    - `tests/adapters/test_stdio_e2e.py` (new case: `.ics` or LinkedIn fixture end-to-end stage → review → commit → `resolve_person`, per spec Testing strategy — pick whichever source isn't already covered by an E2E case)
+  - **Scope:** Add `LinkedInImportExtractor` for `source_type="linkedin"`, producing person, optional affiliation, and optional `linkedin_connected_on` fact candidates; never stage the profile URL.
+  - **Touches:** `adapters/linkedin_import.py`, `adapters/import_router.py`, adapter/router/MCP/E2E tests.
   - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "LinkedIn connections-export import")
-    - One `person` candidate per row (First+Last name; `EMAIL` → `handle` alias when present, same as vCard).
-    - One `affiliation` candidate per row only when both Company and Position are present, using existing `AffiliationCandidateInput` shape (`org`, `role`).
-    - Optional `fact` candidate (`predicate="linkedin_connected_on"`, `value=<Connected On date>`) using existing `FactCandidateInput` shape, same pattern as vCard's `BDAY`→birthday fact.
-    - `URL` column is never staged as alias or fact — not a name-shaped identity signal.
-    - Resolve open question #3 (strict known-header validation vs. tolerant superset) and record the decision in the PR description; fail closed on drift is the safer default absent other guidance.
-  - **Tests/validation:** `uv run ruff check .` clean, `uv run pytest -q` fully green. New `tests/adapters/test_linkedin_import.py` modeled on `test_vcard_import.py`: per-row independence, missing-required-field skips (e.g. missing name), a raw-content sentinel if the export variant includes a free-text note field, header-set validation behavior per the decision above. Router test extended to cover all four source types plus unknown-type error path. MCP in-memory test extended. One new stdio E2E case (`tests/adapters/test_stdio_e2e.py`) covering full stage→review→commit→resolve for whichever of `.ics`/LinkedIn lacks E2E coverage yet.
-  - **Out of scope:** `init`/`demo` CLI commands (PR M9.4).
+    - Preserve existing `email`, `mbox`, `vcard`, and `ics` branches while adding `linkedin`.
+    - Router coverage now spans five accepted source values plus the unknown-value error path.
+    - Per-row failures remain independent; free-text/URL content is never staged.
+  - **Tests/validation:** Adapter tests cover row independence, required fields, header policy, and raw-content exclusion. Router tests cover `email`, `mbox`, `vcard`, `ics`, `linkedin`, and unknown values. Add one full import E2E case. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** onboarding commands.
 
-- [ ] **PR M9.4 — `people-context init` and `people-context demo` CLI commands**
-  - **Scope:** Add two new CLI subcommands composing only existing use cases: `init` (interactive onboarding: optional vCard import via `ImportContent`/`ReviewImport`/`CommitImport`, self-person seeding via `RememberPerson(is_self=True)`, optional communication philosophy via `SetCommunicationPhilosophy`) and `demo` (`[--reset]`, seeds a fictional dataset into a dedicated, non-default demo database path via `RememberPerson`/`SetRelationship`/`RecordInteraction`, then prints example tool invocations). No new ports or app-layer classes.
-  - **Touches:**
-    - `src/people_context/cli.py` (`build_parser()`: add `init` and `demo` subparsers; `main()`: dispatch; new `_cmd_init`, `_cmd_demo` functions)
-    - `src/people_context/config.py` (add demo-db path resolution helper, distinct filename, same XDG-based resolution as `resolve_db_path` but never reading `--db`/`PEOPLE_CONTEXT_DB`)
-    - a demo dataset fixture, e.g. `src/people_context/adapters/demo_data.py` or `tests/fixtures/demo_dataset.json` (decide per spec open question #4 — checked-in fixture vs. procedural generation; a checked-in fixture is recommended for determinism/diffability)
-    - `tests/test_cli.py` (new `init` and `demo` test cases)
-    - `docs/import.md` or `README.md` (document the two new commands; roadmap already gives the exact invocation forms `uv run people-context init` / `uv run people-context demo [--reset]`)
-  - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "`people-context init`" and "`people-context demo`")
-    - `init` reuses `ImportContent`→`ReviewImport`→`CommitImport` unchanged for optional vCard import; seeds self person via `RememberPersonInput(name=..., is_self=True, source="cli")`, relying on existing `SelfAlreadyExistsError`/single-self invariant; optional philosophy via `SetCommunicationPhilosophy`. No new port/app-layer class.
-    - `demo` must NEVER touch the resolved `--db`/environment/config database — it resolves its own fixed demo path only (hard safety property, not convenience) and ignores `--db`/`PEOPLE_CONTEXT_DB` for its target.
-    - `demo` refuses to reseed a non-empty demo database unless `--reset` is passed, checked via existing `PersonReader.list_people(include_deleted=True, limit=1)`.
-    - On success `demo` prints the resolved demo database path and copy-pasteable example calls for `resolve_person`, `get_relationship_graph`, `find_connection`.
-    - Both commands are CLI-only per Security section — no MCP tool triggers a full import or implicit self-person seeding.
-    - Resolve open question #1 (whether `init` refuses to run twice like `demo`, or allows additive re-runs) and record the decision in the PR description.
-  - **Tests/validation:** `uv run ruff check .` clean, `uv run pytest -q` fully green. New CLI tests in `tests/test_cli.py`: `init` with non-interactive/scripted input (covering optional-vCard-skip and optional-philosophy-skip paths, self-person seeding, `SelfAlreadyExistsError` handling on a second run); `demo` asserting it never touches a `--db`-specified path, refuses to reseed without `--reset`, and succeeds with `--reset`. App-layer: fake-port tests (`tests/app/fakes.py`'s `FakePeopleRepository`) for the `init` self-seeding and `demo` multi-use-case seeding sequence, plus real-SQLite coverage of the same paths.
-  - **Out of scope:** any MCP tool changes (none are in scope for this milestone); OAuth/API-based calendar or LinkedIn integration (explicit non-goal).
-## M10 — Agent utilization
+- [ ] **PR M9.4 — `people-context init` and packaged `people-context demo`**
+  - **Scope:** Add interactive `init` and deterministic `demo [--reset]` CLI compositions. The demo dataset must be usable from an installed wheel: generate it procedurally or ship it as declared package data under `src/people_context/`; production code must never read it from `tests/fixtures`.
+  - **Touches:** `cli.py`, `config.py`, `adapters/demo_data.py` or package data under `src/people_context/data/`, CLI tests, packaging smoke coverage, and docs.
+  - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "`people-context init`" / "`people-context demo`")
+    - `init` composes existing import/self/philosophy use cases; no new app port.
+    - `demo` ignores the real resolved DB, uses a dedicated path, and refuses reseeding without `--reset`.
+    - Fictional seed data is deterministic and present in the built wheel.
+  - **Tests/validation:** Test onboarding branches, DB isolation/reset behavior, deterministic seed output, and a clean-environment wheel install followed by `people-context demo --reset`. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** MCP onboarding and live external integrations.
+
+## M10 — Agent utilization## M10 — Agent utilization
 
 > Ship prompt/skill/command content (no new tools, ports, or response fields) so agents reliably use the `resolve_person`, `get_communication_guidance`, and stage/review/commit flow that already exists.
 
@@ -242,22 +222,14 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
   - **Out of scope:** the bundle reader/exporter that will consume `limit=None` (PR M11.2).
 
 - [ ] **PR M11.2 — Bundle export: `BundleReader`, `ExportSyncBundle`, `sync push` CLI**
-  - **Scope:** A new narrow read port that performs the domain snapshot, relationship vocabulary, complete changelog, device rows, and HLC watermark reads inside one `SqliteUnitOfWork` transaction, a pure app-layer use case that assembles the versioned `SyncBundle` envelope from it, and the `people-context sync push --output DIR` CLI command that writes it as owner-only-permission JSON. No restore/write path in this PR.
-  - **Touches:**
-    - `src/people_context/ports/sync_bundle.py` (new) — `BundleReader` Protocol, one method, plus the `SyncBundle` envelope shape (or define the Pydantic model in `app/sync_bundle.py` per the one-module-per-use-case convention)
-    - `src/people_context/adapters/sqlite/bundle_reader.py` (new) — `SqliteBundleReader`, single-transaction read reusing `ExportReader`'s row shapes and `SqliteChangelog.list_entries(limit=None)` internally (joins the already-open outer transaction)
-    - `src/people_context/app/sync_bundle.py` (new) — `ExportSyncBundle` use case (read-only, no `audit_mutation`/UoW needed here — the consistency guarantee lives in the adapter)
-    - `src/people_context/cli.py` — `sync` subparser, `push` subcommand, `_cmd_sync_push` following the `_cmd_export` 0o600-permission pattern (`cli.py:366-376`)
-    - `docs/cli.md`, `docs/privacy-and-safety.md` (bundle is plaintext JSON — same posture as `export`, call this out prominently)
-    - `tests/adapters/test_sqlite_bundle_reader.py` (new), `tests/app/test_sync_bundle.py` (new, fake-port), `tests/test_cli.py` (sync push cases)
-  - **Spec:** m11-sync-bundle-and-bootstrap-restore.md "Design > Bundle contents and envelope"
-    - envelope: `format="people-context-sync-bundle"`, `version=1`, `created_at`, `origin_device_id`, `watermark`, `devices`, `snapshot`, `relationship_vocabulary`, `changelog` (exact shape in spec's JSON example)
-    - `devices` collection includes every device referenced by any changelog entry plus the active origin device even with zero operations
-    - `relationship_vocabulary` includes both seeded and custom rows from both vocabulary tables (an omission `people-context export` also has today, not fixed here — out of scope)
-    - the read must be one transaction end-to-end — two independent adapter reads (as `read_export()` does today) is the exact bug this PR avoids
-    - `push` writes `DIR/people-context-sync-bundle.json` with `os.open(..., os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)`, mirroring `_cmd_export`
-  - **Tests/validation:** fake-`BundleReader` test for `ExportSyncBundle` envelope shape in `tests/app/`; `tests/adapters/test_sqlite_bundle_reader.py` asserting all collections come from one transaction (a second-connection write during the read must not appear partially — same style as `tests/adapters/test_sqlite_unit_of_work.py`); `tests/test_cli.py` covers `sync push` success output (bundle path, entity counts, changelog count, watermark) and the 0o600 permission check. `uv run ruff check .` clean, `uv run pytest -q` green.
-  - **Out of scope:** `sync pull`/restore (PR M11.3); any MCP tool (this stays CLI-only per spec, matching `export-vault`'s posture).
+  - **Scope:** Add a single-transaction `BundleReader`, an `ExportSyncBundle(BundleReader, Clock)` use case, and `sync push`. Database state comes from one SQLite snapshot; injected `Clock` supplies deterministic/testable `created_at`.
+  - **Touches:** sync-bundle port/model, SQLite reader, app use case, CLI/docs, and app/adapter/CLI tests.
+  - **Spec:** (docs/specs/m11-sync-bundle-and-bootstrap-restore.md, "Bundle contents and envelope" / "New app-layer use cases")
+    - Envelope uses `created_at = clock.now()` and the specified format/version/origin/watermark/devices/snapshot/vocabulary/changelog fields.
+    - All database-derived collections come from one transaction; changelog read is unbounded and deterministic.
+    - Output file mode is `0o600`.
+  - **Tests/validation:** Fake reader + fake clock pin exact metadata; SQLite tests prove consistent snapshot behavior; CLI tests cover output and permissions. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** restore and MCP exposure.
 
 - [ ] **PR M11.3 — Bootstrap restore: `BootstrapRestorer`, `RestoreSyncBundle`, `sync pull` CLI (largest PR — keep tightly scoped to restore only)**
   - **Scope:** The atomic, verbatim bulk-write restore path targeting only a freshly initialized, empty database, plus the `people-context sync pull --input PATH [--yes]` CLI command with preview-before-destructive-action confirmation. Depends on PR M11.2 for the `SyncBundle` envelope shape it consumes.
@@ -310,15 +282,15 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
   - **Tests/validation:** `uv run ruff check .` clean; `uv run pytest -q` green (no behavior touched, so this is a regression guard); manual link-check that every new cross-reference in `README.md`'s docs table resolves to a real file (spec's stated validation for the docs-only slice).
   - **Out of scope:** version bump and release-checklist update (PR M12.2); the threat-model comparison subsection (PR M12.3); README "Demo" section (can ride with M12.3 or its own follow-up, see M12.3 scope).
 
-- [ ] **PR M12.2 — Bump to 1.0.0 and update the release checklist**
-  - **Scope:** Bump `project.version` in `pyproject.toml` to `1.0.0`, change the classifier from `"Development Status :: 3 - Alpha"` to `"Development Status :: 5 - Production/Stable"`, and add one checklist item to `docs/releasing.md` requiring the compatibility-promise doc (from M12.1) to be published before tagging. Depends on M12.1 being merged first so the checklist item references a real doc.
-  - **Touches:** `pyproject.toml` (`project.version`, classifiers), `docs/releasing.md` ("Publish a release" section).
-  - **Spec:** from `docs/specs/m12-trust-stability-v1.md` "Version and release checklist":
-    - Follow the exact existing procedure in `docs/releasing.md#publish-a-release` (update version → merge → tag → GitHub Release → approve `pypi` environment) — do not redesign the release workflow.
-    - Add exactly one new checklist item: confirm `docs/compatibility.md` is published before the tag.
-    - No other pyproject changes in this PR (the `encrypted` extra is PR M12.4's concern, not this one's).
-  - **Tests/validation:** `uv run ruff check .` clean; `uv run pytest -q` green; `tests/test_packaging_metadata.py` (existing) must still pass against the new version/classifier — check whether it asserts an exact version string and update the assertion in lockstep if so.
-  - **Out of scope:** SQLCipher extra and any dependency additions; actually cutting the 1.0.0 release/tag (that's a post-merge human action, not part of this PR's diff).
+- [ ] **PR M12.2 — Bump to 1.0.0 and synchronize distribution metadata**
+  - **Scope:** Bump `project.version` and classifier, update the release checklist, and synchronize all version-bearing M8 artifacts in the same commit.
+  - **Touches:** `pyproject.toml`, `server.json`, `mcpb/manifest.json`, `mcpb/pyproject.toml`, `docs/releasing.md`, and a metadata-sync test.
+  - **Spec:** (docs/specs/m12-trust-stability-v1.md, "Version and release checklist")
+    - Project version, Registry PyPI package version, MCPB semantic `version`, and MCPB `people-context` dependency pin all become `1.0.0` together.
+    - MCPB `manifest_version` is a schema version and is not coupled to the application release.
+    - CI fails on semantic-version drift, preferably via one canonical check.
+  - **Tests/validation:** Parse all four metadata artifacts and assert semantic synchronization while validating `manifest_version` separately. Existing packaging tests remain green.
+  - **Out of scope:** cutting the release/tag, SQLCipher, or changing the MCPB schema version without an upstream requirement.
 
 - [ ] **PR M12.3 — Threat-model comparison and README demo polish**
   - **Scope:** Append a factual, sourced subsection to the existing "Threat model notes" heading in `docs/privacy-and-safety.md` comparing this project's local-first model against cloud-hosted memory tools (mem0, Zep, similar); add a short "Demo" section to `README.md` between "Why" and "Quick start" walking through `people-context demo` (M9). Documentation only.
@@ -363,17 +335,14 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
   - **Out of scope:** `upcoming_dates` (PR M13.2); any elevated/operator variant; relationship "health" scoring (explicit non-goal).
 
 - [ ] **PR M13.2 — `upcoming_dates` MCP tool + `people-context upcoming` CLI**
-  - **Scope:** App use case `app/list_upcoming_dates.py` composing the existing `ContextReader.list_facts` port method and the existing `ListReminders` use case (`app/list_reminders.py`); new MCP tool and `people-context upcoming` CLI report. No new port needed (reuses `ContextReader`/`ListReminders`).
-  - **Touches:** `src/people_context/app/list_upcoming_dates.py` (new), MCP tool registration alongside `get_stale_relationships`'s module from M13.1, `src/people_context/cli.py` (`upcoming` subcommand), `tests/app/` (new test module), `tests/adapters/test_mcp_server.py` (extend), CLI test additions.
-  - **Spec:** from `docs/specs/m13-daily-utility.md` "`upcoming_dates`" section:
-    - Fact qualifies only if `sensitivity` passes the ordinary `public`/`personal` boundary (same as `get_person_context`) — a sensitive/restricted birthday fact must be entirely invisible, since the fact's `value` *is* the date (no partial-disclosure mitigation applies).
-    - `predicate` must be date-like — initially exactly `birthday`; value must parse as ISO date or recurring `--MM-DD`; unparseable values are skipped and counted in `skipped_unparseable`, never guessed (resolves Open Question 3 by shipping exactly one predicate for now).
-    - Reminders qualify when `status` active and `due_at` inside the window.
-    - Params: `window_days` (default 30, capped at 366), optional `person_id`.
-    - Response: list of `{person_id, name, kind: "birthday"|"reminder", date, label}` ordered by date, plus `skipped_unparseable` count.
-    - MCP tool `readOnlyHint=true`.
-  - **Tests/validation:** app-layer fake-port tests for ISO/`--MM-DD`/unparseable-skip-counting date parsing; sensitivity-boundary test (restricted birthday fact never appears in output nor in `skipped_unparseable`); MCP in-memory server test for contract/annotations; CLI snapshot test for `upcoming`; one E2E stdio case (per spec "Testing strategy") recording interactions/reminders then asserting `stale` and `upcoming` CLI output against the same data through MCP context reads — this can be the single E2E test covering both M13.1 and M13.2 tools, added in whichever of the two PRs lands second (this one). `uv run ruff check .` clean; `uv run pytest -q` green.
-  - **Out of scope:** additional date-like predicates beyond `birthday` (e.g. `anniversary` — Open Question 3, deferred); elevated variants; meeting-prep skill content (PR M13.3).
+  - **Scope:** Add `ListUpcomingDates(ContextReader, ListReminders, PersonReader, Clock)`. `Clock` anchors the date window and `PersonReader` supplies output names; expose through a read-only MCP tool and CLI.
+  - **Touches:** app use case, MCP registration, CLI, and app/MCP/CLI/E2E tests.
+  - **Spec:** (docs/specs/m13-daily-utility.md, "`upcoming_dates` / CLI report")
+    - Use `clock.now()` only; document and test inclusive interval boundaries.
+    - Facts come from `ContextReader`, reminders from `ListReminders`, and names from `PersonReader`; skip missing/deleted people deterministically.
+    - Only ordinary birthday facts and active dated reminders inside the same window qualify.
+  - **Tests/validation:** Fake-clock tests cover today, final included date, and just-outside boundaries, plus recurring dates/leap day, name lookup, missing people, sensitivity, MCP shape, CLI snapshot, and E2E composition. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** more predicates, elevated variants, and meeting-prep content.
 
 - [ ] **PR M13.3 — Meeting-prep skill content + `reminders-ics` export**
   - **Scope:** Two independent, small, plugin/CLI-only deliverables bundled for size: (a) a meeting-preparation section added to the existing M10 skill (prompt content only, zero server code); (b) `people-context reminders-ics --output FILE`, a CLI-only deterministic iCalendar export of reminders.
@@ -432,24 +401,14 @@ Cross-milestone dependencies (everything else orders freely by milestone number)
   - **Out of scope:** CardDAV (explicit non-goal); Outlook/WhatsApp import; any change to the importer side of vCard.
 
 - [ ] **PR M14.3 — Outlook CSV + WhatsApp import extractors**
-  - **Scope:** Build on the M9-relocated `ImportExtractorRouter`, add `OutlookImportExtractor` and `WhatsAppImportExtractor`, and explicitly widen the extractor contract for self-sender resolution. `ImportContent` derives `self_names` and accepts the additive public `self_sender` hint; the Protocol, router, and every concrete extractor existing by M14 must accept the new optional keyword arguments so existing email/vCard/ICS/LinkedIn imports cannot fail with unexpected-keyword `TypeError`. No new MCP tool; `import_content` gains only the two `source_type` values and one additive optional parameter.
-  - **Touches:**
-    - `src/people_context/adapters/import_router.py` (add Outlook/WhatsApp branches and forward the complete extractor keyword contract)
-    - `src/people_context/adapters/outlook_import.py`, `src/people_context/adapters/whatsapp_import.py` (new)
-    - `src/people_context/ports/imports.py` (`ImportExtractor.extract`: add optional `self_names` and `self_sender` keywords with backward-compatible defaults)
-    - `src/people_context/app/import_content.py` (derive normalized `self_names`; add/pass through optional `self_sender`)
-    - every concrete extractor present after M9: `email_import.py`, `vcard_import.py`, `ics_import.py`, `linkedin_import.py` (accept the two optional keywords explicitly; ignore only those not relevant to that source)
-    - `src/people_context/adapters/mcp/tools/imports.py` (additive `self_sender` tool parameter)
-    - `tests/adapters/test_outlook_import.py`, `tests/adapters/test_whatsapp_import.py` (new), `tests/adapters/test_import_router.py` and existing importer tests (extend/regress the full dispatch and keyword-forwarding matrix)
-  - **Spec:** (docs/specs/m14-ecosystem-interop.md §"Outlook CSV and WhatsApp import extractors")
-    - Outlook maps First/Middle/Last/E-mail/Company/Job Title/Birthday columns to `person` + `handle` alias, `affiliation`, and `birthday` fact; tolerate a superset of columns and skip malformed rows independently.
-    - WhatsApp parses **only** the `[date, time] Sender Name:` prefix; message text after `: ` is never read into any candidate field. Senders dedupe by normalized name; stage one `interaction` per calendar day per chat with channel `"whatsapp"`.
-    - Contract widening is explicit, not `**kwargs`: `ImportExtractor.extract(..., self_addresses, self_names=None, self_sender=None)`. The router forwards both values and every concrete implementation accepts them, preserving all pre-M14 source types.
-    - `ImportContent` derives `self_names` from the self person's normalized canonical name and all alias values. WhatsApp also honors the optional explicit `self_sender` hint. Matching senders are excluded from external `person` candidates and represented as self-participation.
-    - Everything stages through the unchanged `import_content` → `review_import` → `commit_import` gate; no schema change.
-    - Raw-content exclusion is enforced by a sentinel test matching the existing vCard pattern.
-  - **Tests/validation:** Existing email, vCard, ICS, and LinkedIn imports are each exercised through `ImportContent` after the signature widening, proving no unexpected-keyword failure and unchanged candidate output. Router tests cover all six source types, unknown types, and forwarding of `self_addresses`/`self_names`/`self_sender`. WhatsApp fixtures cover self under a matching alias, `"You"`, and a phone number supplied through `self_sender`; one stdio E2E case commits a WhatsApp import and proves message-body sentinel text never reaches `get_person_context`. `uv run ruff check .` clean, `uv run pytest -q` fully green.
-  - **Out of scope:** Signal import; locale-format hinting beyond the first explicitly supported WhatsApp formats; a generic extensible context object or untyped `**kwargs` escape hatch.
+  - **Scope:** Add Outlook and WhatsApp extractors while explicitly widening the extractor keyword contract. Preserve all five pre-M14 accepted source values: `email`, `mbox`, `vcard`, `ics`, and `linkedin`.
+  - **Touches:** router, new extractors, `ImportExtractor` Protocol, `ImportContent`, every concrete extractor, MCP import tool, and complete adapter/router/E2E tests.
+  - **Spec:** (docs/specs/m14-ecosystem-interop.md, "Outlook CSV and WhatsApp import extractors")
+    - Add optional `self_names` and `self_sender` to the explicit Protocol; every implementation accepts them and the router forwards them.
+    - Outlook/WhatsApp become the sixth and seventh accepted source values; unknown values still fail closed.
+    - WhatsApp never persists message bodies and excludes self senders by aliases or explicit hint.
+  - **Tests/validation:** Exercise `email`, `mbox`, `vcard`, `ics`, and `linkedin` through `ImportContent` after widening. Router tests cover all seven accepted source values plus unknown. Add Outlook/WhatsApp parsing, self-resolution, and raw-content sentinel coverage. `uv run ruff check .` and `uv run pytest -q` fully green.
+  - **Out of scope:** Signal and untyped `**kwargs`.
 
 - [ ] **PR M14.4 — Obsidian plugin (`obsidian-plugin/`)**
   - **Scope:** New in-repo TypeScript package under `obsidian-plugin/`, structured like `openclaw-plugin/` (own `package.json`, `tsconfig.json`, `vitest`), rendering read-only person panes by shelling out to the CLI's `--json` output. Adds the CI mirror-to-distribution-repo workflow. Does not add any Python/server code and does not open the SQLite database.

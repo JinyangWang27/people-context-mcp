@@ -73,17 +73,11 @@ No new port or app-layer class is required; `init` is purely a new CLI compositi
 
 ### `people-context demo`
 
-A new CLI subcommand that **never** touches the resolved `--db`/environment/config database. It opens (or
-creates) a separate, fixed demo database path — e.g. `{XDG data dir}/people-context/demo.db`, resolved the same
-way `config.py:resolve_db_path` resolves the default path, but with a distinct filename — refuses to reseed a
-non-empty demo database unless `--reset` is passed (checked via the existing
-`PersonReader.list_people(include_deleted=True, limit=1)`), and then calls `RememberPerson`, `SetRelationship`
-(`src/people_context/app/set_relationship.py`), and `RecordInteraction`
-(`src/people_context/app/record_interaction.py`) to create a handful of fictional people and relationships.
-On success it prints the resolved demo database path and copy-pasteable example calls for `resolve_person`,
-`get_relationship_graph`, and `find_connection` (either as MCP tool-call JSON or as
-`uv run people-context --db <demo path> show <name>` CLI examples), so a user can immediately see the graph
-tools work without risking their real data.
+The command always uses a dedicated demo database and refuses reseeding without `--reset`. Its deterministic
+fictional dataset is runtime product data, so it must ship in installed artifacts: implement it procedurally under
+`src/people_context/` or declare package data there. Production code must not read from `tests/fixtures`, which is
+not included by the current wheel configuration. Acceptance includes building and installing the wheel in a clean
+environment and successfully running `people-context demo --reset`.
 
 ### `.ics` calendar import
 
@@ -129,17 +123,11 @@ email address already captured.
 
 ### Router relocation
 
-`ImportExtractorRouter` (`src/people_context/adapters/vcard_import.py:25`) currently special-cases `"vcard"`
-and falls through to the email extractor for everything else — a two-branch router that only works because
-there are exactly two source types today. This milestone moves it to a new `adapters/import_router.py` module
-that imports `EmailImportExtractor`, `VCardImportExtractor`, `IcsImportExtractor`, and
-`LinkedInImportExtractor` and dispatches on an explicit `source_type` match (raising the existing
-`ImportExtractionError("invalid_source_type", ...)` for anything unrecognized, instead of silently defaulting
-to the email extractor). `adapters/vcard_import.py` keeps only `VCardImportExtractor` and its parsing helpers.
-The one call site that constructs the router, `adapters/mcp/server.py:51,233`
-(`from people_context.adapters.vcard_import import ImportExtractorRouter`), updates its import to the new
-module; `ImportContent`'s constructor signature (`app/import_content.py:310`) is unaffected, since it already
-takes an `ImportExtractor` by Protocol, not a concrete class.
+The current router delegates non-vCard sources to `EmailImportExtractor`, which already accepts both `email` and
+`mbox`. There are therefore three accepted source values before M9. Move dispatch to `adapters/import_router.py`
+and make it explicit: `email`/`mbox` → email extractor; `vcard` → vCard extractor; later branches add `ics` and
+`linkedin`; every other value raises `ImportExtractionError("invalid_source_type", ...)`. Preserve `mbox`'s
+path-only validation and existing output exactly.
 
 ## Migration needs
 
@@ -186,23 +174,12 @@ rather than inventing per-source skip fields.
 
 ## Testing strategy
 
-- App layer: fake-port tests against `tests/app/fakes.py`'s existing `FakePeopleRepository` for `init`'s
-  `RememberPerson(is_self=True)` seeding and `demo`'s multi-use-case seeding sequence.
-- Adapter layer: `tests/adapters/test_ics_import.py` and `tests/adapters/test_linkedin_import.py`, modeled
-  directly on the structure of `tests/adapters/test_vcard_import.py` (per-item independence — one malformed
-  event/row never blocks its neighbors; missing-required-field skip reasons; self-address/self-row filtering;
-  a raw-content sentinel value that must never appear in any staged candidate, mirroring
-  `test_vcard_import.py`'s `_NOTE_SENTINEL` pattern). The `.ics` tests must include cross-event deduplication:
-  two events sharing one attendee address under different `CN` display names stage exactly one person candidate
-  carrying both name variants, referenced by both interaction candidates.
-- Router: a `tests/adapters/test_import_router.py` covering the relocated `ImportExtractorRouter` dispatch for
-  all four source types plus the unknown-`source_type` error path.
-- MCP layer: extend `tests/adapters/test_mcp_server.py`'s in-memory server tests with `import_content` calls
-  for `source_type="ics"` and `"linkedin"`.
-- CLI layer: new tests in `tests/test_cli.py` for `init` (non-interactive/scripted input) and `demo` (asserting
-  it never touches a `--db`-specified path and refuses to reseed without `--reset`).
-- E2E: a `tests/adapters/test_stdio_e2e.py` case importing an `.ics` fixture end-to-end (stage → review →
-  commit → `resolve_person`), following the existing `test_real_stdio_mbox_import_commit_and_resolve` pattern.
+- App tests cover `init` and deterministic demo seeding.
+- Adapter tests cover ICS/LinkedIn independence, self filtering, deduplication, and raw-content exclusion.
+- Router tests cover all five accepted source values (`email`, `mbox`, `vcard`, `ics`, `linkedin`) plus unknown.
+- MCP tests exercise the two new sources; E2E retains explicit `mbox` coverage and adds one new-source flow.
+- CLI tests prove demo isolation/reset behavior.
+- Packaging acceptance builds and installs the wheel in a clean environment and runs `people-context demo --reset`.
 
 ## Open questions
 
@@ -214,5 +191,4 @@ rather than inventing per-source skip fields.
 3. LinkedIn's exact CSV column set and header-preamble format have changed across export-tool versions; should
    the extractor validate a known header set strictly (failing closed on drift) or tolerate a superset of
    expected columns?
-4. Should `people-context demo`'s fictional dataset be checked into the repository as a fixture (deterministic,
-   diffable) or generated procedurally at run time?
+4. Should the packaged fictional dataset use Python constants or declared JSON package data under `src/people_context/`? Either is acceptable; `tests/fixtures` is not.
