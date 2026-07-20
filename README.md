@@ -82,15 +82,38 @@ The directory is accepted only when nonexistent, empty, or already marked with `
 Re-export is byte-deterministic over unchanged data. Sensitive/restricted facts require the explicit
 `--include-sensitive` flag; exported files are outside server disclosure controls.
 
-## MCP client configuration
+## Claude Code and Codex plugins
 
-Claude Code:
+### Claude Code
+
+Install the repository as a Claude Code marketplace and add the bundled plugin:
 
 ```bash
-claude mcp add people-context -- uvx --from people-context people-context-mcp
+claude plugin marketplace add JinyangWang27/people-context-mcp
+claude plugin install people-context@people-context-plugins
 ```
 
-Generic stdio configuration:
+Restart Claude Code or run `/reload-plugins` after installation. The plugin launches the local stdio server,
+stores data outside the installed plugin copy, and keeps sensitive-context and full-export tools disabled by
+default. See [docs/claude-code-plugin.md](docs/claude-code-plugin.md) for runtime, update, validation, and
+publishing details.
+
+### Codex
+
+Install the repository as a Codex marketplace and add the bundled plugin:
+
+```bash
+codex plugin marketplace add JinyangWang27/people-context-mcp
+codex plugin add people-context@people-context-plugins
+```
+
+Start a new Codex session after installation. The plugin launches the local stdio server, stores data outside
+the installed plugin copy, and keeps sensitive-context and full-export tools disabled by default. See
+[docs/codex-plugin.md](docs/codex-plugin.md) for runtime, update, validation, and publishing details.
+
+### Other MCP clients
+
+Clients that support local stdio MCP servers can use:
 
 ```json
 {
@@ -102,19 +125,6 @@ Generic stdio configuration:
   }
 }
 ```
-
-## Codex plugin
-
-Install the repository as a Codex marketplace and add the bundled plugin:
-
-```bash
-codex plugin marketplace add JinyangWang27/people-context-mcp
-codex plugin add people-context@people-context-plugins
-```
-
-Start a new Codex session after installation. The plugin launches the same local stdio server, stores data
-outside the installed plugin copy, and keeps sensitive-context and full-export tools disabled by default. See
-[docs/codex-plugin.md](docs/codex-plugin.md) for runtime, update, validation, and publishing details.
 
 ## Security model
 
