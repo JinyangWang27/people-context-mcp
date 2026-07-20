@@ -6,15 +6,15 @@ Status: Planned. See [docs/roadmap.md](../roadmap.md#m12--trust-stability-and-v1
 
 `pyproject.toml` still classifies the project as Alpha, although the implementation already follows an additive
 response-contract discipline and forward-only migrations. M12 turns that practice into an explicit compatibility
-promise, synchronizes every distribution surface for 1.0, adds an opt-in encrypted SQLite connection path, and
-publishes a factual local-first threat-model comparison.
+promise, synchronizes every server-distribution surface for 1.0, adds an opt-in encrypted SQLite connection path,
+and publishes a factual local-first threat-model comparison.
 
 ## Scope
 
 In scope:
 
-- a written MCP, CLI, and DB compatibility promise;
-- a synchronized `1.0.0` release metadata update;
+- a written MCP, stable-JSON, CLI, and DB compatibility promise;
+- a synchronized `1.0.0` primary server release metadata update;
 - opt-in SQLCipher at-rest encryption;
 - a sourced threat-model comparison with cloud-hosted memory tools;
 - README demo polish built on M9's packaged demo.
@@ -38,10 +38,10 @@ Add `docs/compatibility.md`, linked from the README and `docs/mcp-interface.md`,
 - **Database:** migrations are forward-only and additive within a major version; no migration drops or narrows a
   column read by shipped application code.
 - **CLI:** existing commands and flags keep working; new flags are additive and preserve previous defaults.
-- **Machine-readable outputs:** a command explicitly documented as a stable JSON interface, such as the M14 brief
-  and person-index outputs, follows the same additive field rule. Human-formatted tables/Markdown remain outside
-  the frozen contract unless separately declared.
-- **Vault Markdown:** deterministic but explicitly not frozen as a compatibility surface in 1.0.
+- **Machine-readable outputs:** a command explicitly documented as a stable JSON interface follows the same
+  additive-field rule and carries a documented schema/version where appropriate.
+- **Human formats:** tables and Markdown remain outside the frozen contract unless separately declared. The vault
+  Markdown layout is deterministic but explicitly not frozen in 1.0.
 
 Do not promise a deprecation window the project has not historically practiced.
 
@@ -58,14 +58,18 @@ Bump the root project and classifier to `1.0.0`/Production-Stable. In the same c
 MCPB `manifest_version` remains an independent schema-version field and is validated against the supported MCPB
 schema, never set to the application version.
 
-Because the repository runs `uv sync --locked --all-extras` and `uv lock --check`, the same PR must regenerate and
-commit root `uv.lock`; its editable `people-context` package metadata must reflect `1.0.0`. A parser-based metadata
-test locates the Registry package by identifier rather than array position and asserts all semantic release values
-match. `uv lock --check` remains a separate generated-lock integrity gate.
+Because CI runs `uv sync --locked --all-extras` and `uv lock --check`, the PR regenerates and commits root
+`uv.lock`; its editable `people-context` package metadata must reflect `1.0.0`. A parser-based test locates the
+Registry package by identifier rather than array position and asserts the semantic release values match.
 
-The compatibility package under `compat/people-context-mcp/` remains a renamed-distribution shim with its own
-post-release version. Its dependency lower bound already accepts `people-context==1.0.0`; do not falsely force the
-shim's version to match the primary distribution unless that package is intentionally republished.
+Version domains that distribute or wrap the server remain explicit rather than accidentally synchronized:
+
+- `compat/people-context-mcp` is a renamed-distribution shim with its own post-release version; its dependency
+  lower bound already accepts the 1.0 primary package;
+- `.claude-plugin`, `.codex-plugin`, OpenClaw, and future Obsidian plugin manifests are integration-package
+  versions. They are bumped according to their own release/change policy, not mechanically set to the server
+  version. If the 1.0 release intentionally publishes one of those artifacts, its own manifest/marketplace
+  versions must be internally synchronized and tested.
 
 Follow the existing release procedure and update its checklist, but do not create the tag or live release in this
 PR.
@@ -85,15 +89,14 @@ project's supported Python/OS matrix; record the exact supported platforms and p
 an extra that cannot install on a claimed supported platform.
 
 Add `adapters/sqlite/db.py::open_encrypted_db(path, key)` alongside, not as a parameter to, `open_db(path)`. It
-must set the key before reading schema metadata or running migrations, apply the same foreign-key, WAL, busy-timeout,
-and migration setup after keying, and return the same connection interface consumed by existing repositories.
-Every plain-SQLite caller remains unchanged.
+sets the key before reading schema metadata or running migrations, then applies the same foreign-key, WAL,
+busy-timeout, and migration setup. Existing repositories continue to receive an opaque compatible connection.
 
 `people-context-mcp --encrypted` and the global CLI form `people-context --encrypted ...` require
-`PEOPLE_CONTEXT_DB_KEY`. Without the flag, existing plaintext behavior is byte-for-byte unchanged. With the flag
-and no non-empty key, startup refuses clearly and never falls back to plaintext.
+`PEOPLE_CONTEXT_DB_KEY`. Without the flag, plaintext behavior is unchanged. With the flag and no non-empty key,
+startup refuses and never falls back to plaintext.
 
-Changing optional dependencies requires regenerating and committing `uv.lock`. M12.4's required validation is:
+Changing optional dependencies requires regenerating and committing `uv.lock`. Required validation:
 
 ```text
 uv lock --check
@@ -102,8 +105,8 @@ uv run --locked ruff check .
 uv run --locked pytest -q
 ```
 
-CI must actually install the encrypted extra on every platform declared supported for 1.0; tests may skip only on
-explicitly unsupported platforms documented by the release, not because the dependency was omitted from CI.
+CI installs the encrypted extra on every platform declared supported for 1.0; tests skip only platforms explicitly
+excluded by the documented support matrix.
 
 ### Threat-model comparison
 
@@ -120,7 +123,7 @@ Use an “as of YYYY-MM-DD” note and primary vendor documentation. Keep the la
 ### README polish
 
 Add a short Demo section between “Why” and “Quick start”, showing the packaged `people-context demo` flow and its
-dedicated database. All referenced assets and commands must be link/path checked.
+dedicated database. Link/path check every referenced asset and command.
 
 ## Migration needs
 
@@ -138,31 +141,31 @@ No new schema migration. SQLCipher changes the connection-open path, not the log
   payload, or changelog payload.
 - Empty/whitespace-only keys are rejected.
 - Wrong-key errors are generic and never echo key material or sensitive page contents.
-- Verify that the chosen binding encrypts WAL/SHM data as configured; do not infer protection only because the main
-  database cannot be opened by plain SQLite.
+- Verify that the chosen binding protects WAL/SHM data as configured; do not infer protection only because the
+  main database cannot be opened by plain SQLite.
 - Plain SQLite remains the default and documentation must not imply otherwise.
-- A new encrypted database and an existing encrypted database both use the same canonical migration path after the
-  key is applied.
+- A new encrypted database and an existing encrypted database both use the canonical migration path after keying.
 
 ## Testing strategy
 
 ### Compatibility and release metadata
 
-- Link checks for the compatibility document and README additions.
-- Parser-based synchronization test over `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and
-  `mcpb/pyproject.toml`.
-- Assert the root package version recorded in `uv.lock` matches `pyproject.toml` and run `uv lock --check`.
-- Validate MCPB `manifest_version` separately from semantic version fields.
+- link checks for the compatibility document and README additions;
+- parser-based synchronization test over `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and
+  `mcpb/pyproject.toml`;
+- root package version in `uv.lock` matches `pyproject.toml`; `uv lock --check` passes;
+- MCPB `manifest_version` validated separately;
+- integration-package version domains documented and internally checked only when their artifacts are published.
 
 ### Encryption
 
 - missing, empty, and whitespace-only key refusal;
 - create/read/reopen encrypted database with the correct key;
 - wrong-key refusal;
-- plain `sqlite3.connect()` cannot read schema/data from the encrypted database;
-- WAL-mode writes followed by inspection proving companion files do not reveal plaintext sentinel values;
-- existing migrations run after keying;
-- server and CLI refusal without the environment key;
+- plain `sqlite3.connect()` cannot read schema/data;
+- WAL-mode writes followed by inspection proving companion files reveal no plaintext sentinel;
+- migrations run after keying;
+- server and CLI refusal without environment key;
 - key sentinels never appear in stdout, stderr, logs, exceptions, audit rows, or changelog rows;
 - all existing `open_db` tests pass unmodified;
 - locked all-extras installation and tests run in CI.

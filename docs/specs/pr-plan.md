@@ -54,16 +54,17 @@ Check the matching box only in the PR that delivers it.
     no behavior/package change.
   - **Out:** Registry, MCPB, editor configs, Docker.
 
-- [ ] **M8.2 — MCP Registry metadata and ownership marker**
-  - **Scope:** Add root `server.json`, packaged `mcp-name:` README marker, Registry validation, and release docs.
-  - **Touches:** `server.json`, `README.md`, CI/release docs.
+- [ ] **M8.2 — MCP Registry and community-directory metadata**
+  - **Scope:** Add root `server.json`, packaged `mcp-name:` marker, pinned Registry validation, and a current
+    Smithery/PulseMCP/mcp.so/Glama submission matrix plus any required static in-repo metadata files.
   - **Acceptance:** top-level server version equals the `people-context` PyPI package-entry version; stdio package
-    transport is schema-valid; `mcp-publisher` is pinned and used for validation; namespace decision is recorded.
-  - **Out:** live publication, MCPB package entry, community-directory files.
+    transport is schema-valid; namespace decision recorded; each directory's primary docs are cited and its
+    manual-vs-repository submission path is explicit; required validators are pinned.
+  - **Out:** live publication/approval and MCPB package entry.
 
 - [ ] **M8.3 — Native-UV MCPB bundle and editor configs**
-  - **Scope:** Add `mcpb/manifest.json`, root bundle `pyproject.toml`, `server/main.py`, pinned MCPB build tooling,
-    release artifact attachment, and Cursor/Windsurf/VS Code `uvx` snippets.
+  - **Scope:** Add `mcpb/manifest.json`, root bundle `pyproject.toml`, `server/main.py`, exact reviewed MCPB build
+    tooling, release artifact attachment, and Cursor/Windsurf/VS Code `uvx` snippets.
   - **Acceptance:** native `server.type="uv"`; semantic `manifest.json.version` and dependency pin match the release;
     schema `manifest_version` validated separately; archive contents inspected; clean-machine Desktop smoke test.
   - **Security:** document local Python/filesystem permissions; do not vendor an interpreter or model MCPB as an
@@ -72,9 +73,9 @@ Check the matching box only in the PR that delivers it.
 
 - [ ] **M8.4 — Optional non-root Docker image and GHCR release**
   - **Scope:** Multi-stage Dockerfile, `.dockerignore`, tag-triggered GHCR workflow, README volume/env usage.
-  - **Acceptance:** pinned base image digest and Actions; non-root runtime; stdio default; explicit host-mounted DB;
+  - **Acceptance:** pinned base-image digest and Actions; non-root runtime; stdio default; explicit host-mounted DB;
     runtime makes no surprise network calls; image smoke test includes one stdio round trip.
-  - **Out:** HTTP-default image and community-directory metadata.
+  - **Out:** HTTP-default image.
 
 ## M9 — Cold start & onboarding
 
@@ -163,11 +164,12 @@ Check the matching box only in the PR that delivers it.
     deterministic vault Markdown explicitly not frozen; no invented deprecation window.
   - **Out:** release bump, encryption, threat comparison.
 
-- [ ] **M12.2 — Synchronize 1.0 release metadata and lock**
+- [ ] **M12.2 — Synchronize 1.0 server release metadata and lock**
   - **Scope:** Update `pyproject.toml`, `server.json`, MCPB manifest/project, `uv.lock`, classifier, and release docs.
-  - **Acceptance:** five semantic release fields equal `1.0.0`; MCPB schema version independent; Registry entry
-    located by identifier; `uv.lock` root package reflects 1.0; `uv lock --check`; compatibility shim version is
-    not falsely coupled unless intentionally republished.
+  - **Acceptance:** five semantic server-release fields equal `1.0.0`; MCPB schema version independent; Registry
+    entry located by identifier; `uv.lock` root package reflects 1.0; `uv lock --check`.
+  - **Version domains:** compatibility shim and Claude/Codex/OpenClaw/Obsidian plugin versions remain independent;
+    only internally synchronize/bump an integration manifest when that artifact is intentionally published.
   - **Out:** tag/release and SQLCipher.
 
 - [ ] **M12.3 — Dated threat comparison and README demo**
@@ -219,10 +221,11 @@ Check the matching box only in the PR that delivers it.
 
 - [ ] **M14.2 — Deterministic vCard writer**
   - **Scope:** typed vCard port/DTOs, app projection, filesystem adapter, CLI using private writer.
-  - **Acceptance:** active/as-of/sensitivity filtering; one deterministic affiliation; one parseable birthday
-    (`YYYY-MM-DD`/`--MM-DD`); separate omitted-valid and skipped-unparseable counts; 3.0/4.0 canonical bytes and
-    full importer round trip.
-  - **Out:** CardDAV, multi-affiliation/birthday encoding, importer changes.
+  - **Acceptance:** `FN` canonical; `N` stores the whole canonical name in one component without guessing name
+    parts; active/as-of/sensitivity filtering; one deterministic affiliation; one full `YYYY-MM-DD` birthday;
+    separate omitted-valid, skipped-partial, and skipped-unparseable counts; 3.0/4.0 canonical bytes and unchanged-
+    importer exact round trip.
+  - **Out:** CardDAV, multi-affiliation/birthday encoding, partial-birthday importer normalization.
 
 - [ ] **M14.3 — Outlook and WhatsApp extractors**
   - **Scope:** new extractors; explicitly widen Protocol/router/all implementations with `self_names` and
@@ -237,23 +240,26 @@ Check the matching box only in the PR that delivers it.
   - **Execution:** stable person id only; `spawn`/`execFile` argument arrays, `shell:false`, no command string/freeform
     args; timeout, cancellation, bounded stdout/stderr, inert metacharacter fixtures.
   - **Settings:** executable, optional DB path, encrypted boolean, refresh policy; fixed arg array; encrypted mode
-    inherits but never stores/logs `PEOPLE_CONTEXT_DB_KEY`; never `--include-sensitive`.
+    inherits but never stores/logs `PEOPLE_CONTEXT_DB_KEY`; missing key fails without plaintext fallback.
   - **Build:** `npm ci --no-audit --no-fund`; clean lockfile builds; compare artifact checksums; desktop-only manifest.
   - **Out:** DB writes/raw SQLite/community submission itself.
 
 ## M15 — Data quality & credibility
 
 - [ ] **M15.1 — Deterministic doctor findings**
-  - **Scope:** aggregate/finding `CurationReader`, SQLite queries, app report policy, CLI; optional next-free index.
+  - **Scope:** `CurationReader`, SQLite queries, app report policy, CLI; optional next-free index.
   - **Acceptance:** stable codes for duplicate alias/handle, contradictory fact, soft-deleted references; handle
-    precedence; report-only, exit zero with findings, no LLM/auto-fix; suggested follow-ups identify whether each is
-    a CLI command or MCP operator action.
+    precedence; fact overlap exactly matches `ValidityPeriod.overlaps`; report-only and exit zero with findings.
+  - **Actions:** JSON suggestions are structured `{surface, argv}` CLI actions or `{surface, tool, arguments}` MCP
+    actions using ids, never shell-interpolated names; doctor JSON is versioned/stable additive.
   - **Out:** interactive repair and MCP findings tool.
 
 - [ ] **M15.2 — Aggregate-only stats report**
   - **Scope:** narrow `StatsReader`, SQLite aggregate adapter, app redaction, CLI.
-  - **Acceptance:** no record contents/paths from adapter; CLI passes environment-gate booleans and optional path;
-    path redacted by default; stable aggregate JSON; no network/server probe.
+  - **Acceptance:** no record text/device names/paths from adapter; CLI passes environment-gate booleans and optional
+    path; path redacted by default; versioned stable aggregate JSON; no network/server probe.
+  - **Storage:** report main + existing WAL/SHM bytes; in-memory/unavailable path is explicit null/storage-kind,
+    never misleading zero.
   - **Out:** doctor findings/telemetry.
 
 - [ ] **M15.3 — Additive transliteration match detail**
