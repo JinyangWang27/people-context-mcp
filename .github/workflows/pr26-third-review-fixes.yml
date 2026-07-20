@@ -1,0 +1,228 @@
+name: Apply PR 26 second-review fixes
+
+on:
+  pull_request:
+    types: [synchronize]
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: claude/m7-graph-and-vault-6vdtgf
+          fetch-depth: 0
+
+      - name: Apply planning corrections
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise RuntimeError(f'{path}: expected one match, found {count}: {old!r}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          def replace_between(path: str, start: str, end: str, replacement: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              i = text.find(start)
+              if i < 0:
+                  raise RuntimeError(f'{path}: start marker not found: {start!r}')
+              j = text.find(end, i + len(start))
+              if j < 0:
+                  raise RuntimeError(f'{path}: end marker not found: {end!r}')
+              file.write_text(text[:i] + replacement + text[j:], encoding='utf-8')
+
+          plan = 'docs/specs/pr-plan.md'
+          replace_between(plan, '- [ ] **PR M9.1', '- [ ] **PR M9.2', '''- [ ] **PR M9.1 — Relocate `ImportExtractorRouter` without dropping `mbox`**
+  - **Scope:** Move `ImportExtractorRouter` out of `src/people_context/adapters/vcard_import.py` into `src/people_context/adapters/import_router.py` and replace the current fall-through behavior with explicit dispatch. Preserve all three accepted source values that exist before M9: `"email"` and `"mbox"` both route to `EmailImportExtractor`; `"vcard"` routes to `VCardImportExtractor`; unknown values raise `ImportExtractionError("invalid_source_type", ...)`. No new source types yet.
+  - **Touches:**
+    - `src/people_context/adapters/import_router.py` (new)
+    - `src/people_context/adapters/vcard_import.py` (remove `ImportExtractorRouter`, keep `VCardImportExtractor` + parsing helpers)
+    - `src/people_context/adapters/mcp/server.py` (update import at the router construction site)
+    - `tests/adapters/test_import_router.py` (new)
+    - `tests/adapters/test_vcard_import.py` (update import path for `ImportExtractorRouter`)
+  - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "Router relocation")
+    - Dispatch is explicit by accepted source value, not extractor count: `email`/`mbox` → email extractor, `vcard` → vCard extractor; later PRs add `ics` and `linkedin` branches.
+    - `mbox` is an existing public import mode and must remain byte-compatible, including its path-only validation and skip reporting.
+    - Unknown values raise `ImportExtractionError("invalid_source_type", ...)` rather than silently falling through to email.
+    - `ImportContent` remains Protocol-based and its constructor is unaffected.
+  - **Tests/validation:** New router tests cover `email`, `mbox`, `vcard`, and unknown values. An `mbox` regression test exercises the router through `ImportContent` and preserves the existing path-only contract. Existing vCard tests update only their import path. `uv run ruff check .` clean and `uv run pytest -q` fully green.
+  - **Out of scope:** `.ics` and LinkedIn extractors themselves (PR M9.2/M9.3 add branches on top of this module).
+
+''')
+          replace_once(plan, 'now covering all four source types', 'now covering all five accepted source values')
+          replace_once(plan, 'covering all four source types plus unknown-type error path', 'covering all five accepted source values plus the unknown-type error path')
+
+          replace_between(plan, '- [ ] **PR M9.4', '## M10 — Agent utilization', '''- [ ] **PR M9.4 — `people-context init` and packaged `people-context demo` CLI commands**
+  - **Scope:** Add two CLI subcommands composing existing use cases: `init` for interactive onboarding and `demo [--reset]` for a fictional dataset in a dedicated non-default database. The demo dataset must be available in an installed wheel: use procedural generation or package data under `src/people_context/`; never load production demo content from `tests/fixtures`.
+  - **Touches:**
+    - `src/people_context/cli.py` (`init`/`demo` parsers and handlers)
+    - `src/people_context/config.py` (dedicated demo-db path helper that ignores `--db`/`PEOPLE_CONTEXT_DB`)
+    - `src/people_context/adapters/demo_data.py` or packaged data such as `src/people_context/data/demo_dataset.json` plus explicit Hatch package-data configuration if required
+    - `tests/test_cli.py` (CLI behavior)
+    - packaging smoke coverage that builds and installs the wheel, then runs `people-context demo --reset`
+    - `docs/import.md` or `README.md`
+  - **Spec:** (docs/specs/m9-cold-start-and-onboarding.md, "`people-context init`" and "`people-context demo`")
+    - `init` reuses `ImportContent`→`ReviewImport`→`CommitImport`, `RememberPerson(is_self=True)`, and optional `SetCommunicationPhilosophy`; no new app port/use case.
+    - `demo` never touches the resolved real database and refuses to reseed a non-empty demo DB without `--reset`.
+    - The fictional dataset is deterministic and ships inside the wheel, either as Python data or declared package data under `src/people_context/`; a checkout-only `tests/fixtures` dependency is forbidden.
+    - On success, print the demo DB path and copy-pasteable examples for `resolve_person`, `get_relationship_graph`, and `find_connection`.
+  - **Tests/validation:** CLI tests cover optional onboarding branches, second-run handling, real-DB isolation, reset behavior, and deterministic seed content. A built-wheel smoke test installs the artifact into a clean environment and runs `people-context demo --reset`, proving all runtime data is packaged. `uv run ruff check .` clean and `uv run pytest -q` fully green.
+  - **Out of scope:** MCP onboarding tools; OAuth/API integrations.
+
+## M10 — Agent utilization''')
+
+          replace_between(plan, '- [ ] **PR M11.2', '- [ ] **PR M11.3', '''- [ ] **PR M11.2 — Bundle export: `BundleReader`, `ExportSyncBundle`, `sync push` CLI**
+  - **Scope:** Add a narrow snapshot `BundleReader`, an `ExportSyncBundle(BundleReader, Clock)` use case, and `people-context sync push --output DIR`. The adapter reads snapshot, vocabulary, complete changelog, devices, and watermark in one SQLite transaction; the injected `Clock` supplies deterministic/testable `created_at` metadata.
+  - **Touches:**
+    - `src/people_context/ports/sync_bundle.py` (new `BundleReader` and bundle shapes)
+    - `src/people_context/adapters/sqlite/bundle_reader.py` (single-transaction reader)
+    - `src/people_context/app/sync_bundle.py` (`ExportSyncBundle` accepting `BundleReader` and `Clock`)
+    - `src/people_context/cli.py` (`sync push`)
+    - docs and adapter/app/CLI tests
+  - **Spec:** (docs/specs/m11-sync-bundle-and-bootstrap-restore.md, "Bundle contents and envelope" / "New app-layer use cases")
+    - Envelope contains `created_at = clock.now()` plus the specified format/version/origin/watermark/devices/snapshot/vocabulary/changelog fields.
+    - All database-derived fields come from one transaction; time metadata comes from the app-layer `Clock`, matching `ExportData`'s dependency pattern.
+    - `Changelog.list_entries(limit=None)` is unbounded and deterministic.
+    - Output uses owner-only `0o600` permissions.
+  - **Tests/validation:** Fake-reader/fake-clock tests assert the exact `created_at` value and envelope shape. SQLite tests prove snapshot consistency; CLI tests cover counts, path, and permissions. `uv run ruff check .` clean and `uv run pytest -q` fully green.
+  - **Out of scope:** restore (`sync pull`) and MCP exposure.
+
+''')
+
+          replace_between(plan, '- [ ] **PR M12.2', '- [ ] **PR M12.3', '''- [ ] **PR M12.2 — Bump to 1.0.0 and synchronize all distribution metadata**
+  - **Scope:** Bump the project to `1.0.0`, mark it Production/Stable, update the release checklist, and synchronize every version-bearing distribution artifact introduced by M8. Depends on M8.2/M8.3 and M12.1.
+  - **Touches:**
+    - `pyproject.toml` (`project.version`, classifier)
+    - `server.json` (PyPI package version)
+    - `mcpb/manifest.json` (extension semantic `version`; do not change schema `manifest_version` merely because the project version changes)
+    - `mcpb/pyproject.toml` (`people-context` dependency pin)
+    - `docs/releasing.md`
+    - packaging/distribution metadata synchronization test
+  - **Spec:** (docs/specs/m12-trust-stability-v1.md, "Version and release checklist")
+    - `project.version`, Registry package version, MCPB semantic `version`, and MCPB dependency pin must all describe `1.0.0` in the same commit.
+    - MCPB `manifest_version` is the manifest schema version and remains governed by the MCPB specification, not by the application release number.
+    - Prefer one canonical-version helper/check; fail CI on drift.
+    - Add the compatibility-doc release-checklist item without redesigning the release workflow.
+  - **Tests/validation:** A metadata test parses all four artifacts and asserts exact synchronization while separately validating the MCPB schema version field. Existing packaging tests remain green. `uv run ruff check .` clean and `uv run pytest -q` fully green.
+  - **Out of scope:** cutting the tag/release, SQLCipher dependencies, or changing MCPB schema versions without an upstream format requirement.
+
+''')
+
+          replace_between(plan, '- [ ] **PR M13.2', '- [ ] **PR M13.3', '''- [ ] **PR M13.2 — `upcoming_dates` MCP tool + `people-context upcoming` CLI**
+  - **Scope:** Add `ListUpcomingDates(ContextReader, ListReminders, PersonReader, Clock)`, then expose it through a read-only MCP tool and CLI report. `Clock` defines the window anchor; `PersonReader` supplies names for returned `person_id` values.
+  - **Touches:** `src/people_context/app/list_upcoming_dates.py`, MCP registration, CLI command, app/MCP/CLI tests.
+  - **Spec:** (docs/specs/m13-daily-utility.md, "`upcoming_dates` / CLI report")
+    - Compute the window from `clock.now()` with documented inclusive start/end boundaries; never call wall-clock APIs directly.
+    - Facts come from `ContextReader.list_facts`, reminders from `ListReminders`, and names from `PersonReader`; missing/deleted people are skipped deterministically.
+    - Only ordinary-disclosure birthday facts qualify; parse ISO dates or `--MM-DD`, count unparseable ordinary facts, and never reveal elevated facts.
+    - Active reminders with `due_at` inside the same window qualify.
+    - `window_days` defaults to 30 and is capped at 366; optional `person_id`; MCP annotation is read-only.
+  - **Tests/validation:** Fake-clock tests pin exact boundary behavior (today, final included date, just outside both sides), leap-day/recurring-date handling, and deterministic name lookup. Also test missing/deleted persons, sensitivity, unparseable counts, MCP contract, CLI snapshot, and E2E composition. `uv run ruff check .` clean and `uv run pytest -q` fully green.
+  - **Out of scope:** additional predicates, elevated variants, and meeting-prep content.
+
+''')
+
+          replace_once(plan, 'existing email/vCard/ICS/LinkedIn imports', 'existing email/mbox/vCard/ICS/LinkedIn imports')
+          replace_once(plan, 'Existing email, vCard, ICS, and LinkedIn imports are each exercised', 'Existing email, mbox, vCard, ICS, and LinkedIn imports are each exercised')
+          replace_once(plan, 'Router tests cover all six source types', 'Router tests cover all seven accepted source values')
+
+          m9 = 'docs/specs/m9-cold-start-and-onboarding.md'
+          replace_between(m9, '### `people-context demo`', '### `.ics` calendar import', '''### `people-context demo`
+
+A new CLI subcommand that **never** touches the resolved `--db`/environment/config database. It opens a separate,
+fixed demo database path, refuses to reseed a non-empty demo database unless `--reset` is passed, and composes the
+existing write use cases to create fictional people, relationships, and interactions.
+
+The deterministic demo dataset is runtime product data and therefore must ship in installed artifacts. It may be
+implemented procedurally in `src/people_context/adapters/demo_data.py` or stored as declared package data under
+`src/people_context/`; it must not be read from `tests/fixtures`, which is absent from the wheel built by the
+current Hatch configuration. Acceptance includes building/installing the wheel in a clean environment and running
+`people-context demo --reset` successfully. On success the command prints the demo DB path and copy-pasteable
+examples for `resolve_person`, `get_relationship_graph`, and `find_connection`.
+
+''')
+          replace_between(m9, '### Router relocation', '## Migration needs', '''### Router relocation
+
+`ImportExtractorRouter` currently special-cases `"vcard"` and otherwise delegates to `EmailImportExtractor`.
+That email extractor already accepts two public source values, `"email"` and `"mbox"`, so there are three accepted
+values before M9, not two. Move the router to `adapters/import_router.py` and dispatch explicitly:
+
+- `email` and `mbox` → `EmailImportExtractor`;
+- `vcard` → `VCardImportExtractor`;
+- later M9 PRs add `ics` and `linkedin`;
+- every other value raises `ImportExtractionError("invalid_source_type", ...)`.
+
+The relocation must preserve `mbox`'s existing path-only validation and behavior. `ImportContent` remains injected
+through the `ImportExtractor` Protocol, and `adapters/vcard_import.py` retains only vCard parsing.
+
+''')
+          replace_once(m9, 'all four source types plus the unknown-`source_type` error path', 'all five accepted source values (`email`, `mbox`, `vcard`, `ics`, `linkedin`) plus the unknown-`source_type` error path')
+          replace_once(m9, '- CLI layer: new tests in `tests/test_cli.py` for `init` (non-interactive/scripted input) and `demo` (asserting\n  it never touches a `--db`-specified path and refuses to reseed without `--reset`).', '- CLI layer: new tests in `tests/test_cli.py` for `init` and `demo`, plus a built-wheel smoke test that installs the artifact and runs `people-context demo --reset`, proving the fictional dataset is packaged and not checkout-only.')
+          replace_once(m9, '4. Should `people-context demo`\'s fictional dataset be checked into the repository as a fixture (deterministic,\n   diffable) or generated procedurally at run time?', '4. Should the packaged fictional dataset be represented as Python constants or declared JSON package data under `src/people_context/`? Either is acceptable; `tests/fixtures` is not.')
+
+          m11 = 'docs/specs/m11-sync-bundle-and-bootstrap-restore.md'
+          replace_once(m11, '`ExportSyncBundle` — takes a `BundleReader` and returns a `SyncBundle` Pydantic model matching the envelope\n  above. This is a pure read, "a read-only changelog consumer like the existing sync-log CLI," per the source\n  analysis — no mutation; the single-transaction consistency guarantee lives in the adapter, not here.', '`ExportSyncBundle` — takes a `BundleReader` and an injected `Clock`, returning a `SyncBundle` Pydantic model matching the envelope above. Database-derived state comes from the reader\'s single transaction; `created_at` comes from `clock.now()`, matching the deterministic/testable dependency pattern used by `ExportData`. This is a pure read with no mutation.')
+
+          m12 = 'docs/specs/m12-trust-stability-v1.md'
+          replace_between(m12, '### Version and release checklist', '### Opt-in SQLCipher', '''### Version and release checklist
+
+Bump `project.version` to `1.0.0` and the classifier to Production/Stable. Because M8 has already introduced
+version-bearing distribution metadata, the same commit must also update the PyPI package version in `server.json`,
+the MCPB extension's semantic `version`, and the `people-context` dependency pin in the bundled MCPB
+`pyproject.toml`. MCPB `manifest_version` is a schema-version field and is not tied to the application release.
+CI must parse these artifacts and fail on drift, preferably through one canonical-version check.
+
+Follow the existing release procedure and add the checklist item confirming the compatibility-promise document is
+published before tagging. The PR changes metadata only; it does not cut the tag or release.
+
+''')
+          replace_once(m12, '- No new tests are needed for the compatibility-promise doc, version bump, threat-model section, or README\n  polish beyond a documentation link-check (every new cross-reference added to `README.md`\'s docs table\n  resolves to a real file), consistent with this being a docs-only slice of the milestone.', '- Add a distribution-metadata synchronization test that parses `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and `mcpb/pyproject.toml`, asserting one semantic release version while treating MCPB `manifest_version` separately as a schema version. Documentation-only portions still require link checks only.')
+
+          m13 = 'docs/specs/m13-daily-utility.md'
+          replace_between(m13, '### `upcoming_dates` / CLI report', '### Meeting preparation', '''### `upcoming_dates` / CLI report
+
+`ListUpcomingDates` composes four dependencies: facts from `ContextReader`, reminders from `ListReminders`, names
+from `PersonReader`, and an injected `Clock` that anchors the date window. It must not call wall-clock APIs directly.
+The contract documents whether the interval is inclusive; tests pin today, the final included date, and dates just
+outside both boundaries. Missing or soft-deleted people are skipped deterministically rather than producing
+nameless rows.
+
+A fact qualifies only when its sensitivity passes the ordinary `public`/`personal` boundary, its predicate is
+initially exactly `birthday`, and its value parses as ISO date or recurring `--MM-DD`; unparseable ordinary facts
+are counted, while elevated facts remain entirely invisible. Active reminders qualify when `due_at` lies inside
+the same clock-derived window. Parameters remain `window_days` (default 30, capped at 366) and optional
+`person_id`; output contains `{person_id, name, kind, date, label}` ordered by date plus
+`skipped_unparseable`.
+
+''')
+
+          m14 = 'docs/specs/m14-ecosystem-interop.md'
+          replace_once(m14, 'Regression tests exercise every pre-M14 source through `ImportContent` after the signature change.', 'Regression tests exercise every pre-M14 accepted source value (`email`, `mbox`, `vcard`, `ics`, and `linkedin`) through `ImportContent` after the signature change.')
+          PY
+
+      - name: Validate
+        run: |
+          uv run ruff check .
+          uv run pytest -q
+
+      - name: Commit repairs and remove one-off workflow
+        shell: bash
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git rm .github/workflows/pr26-third-review-fixes.yml .github/pr26-third-review-trigger
+          git add docs/specs/pr-plan.md docs/specs/m9-cold-start-and-onboarding.md docs/specs/m11-sync-bundle-and-bootstrap-restore.md docs/specs/m12-trust-stability-v1.md docs/specs/m13-daily-utility.md docs/specs/m14-ecosystem-interop.md
+          git commit -m 'docs: address second PR 26 review'
+          git push origin HEAD:claude/m7-graph-and-vault-6vdtgf
