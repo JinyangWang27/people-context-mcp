@@ -4,179 +4,174 @@ Status: Planned. See [docs/roadmap.md](../roadmap.md#m12--trust-stability-and-v1
 
 ## Motivation
 
-`pyproject.toml` still classifies the project `"Development Status :: 3 - Alpha"`, yet the project has already
-been behaving with 1.0-grade compatibility discipline for several milestones without saying so out loud: the
-README already documents a real backward-compatibility precedent — "the `merge_people` result intentionally
-adds the `duplicate_relationships_removed` field... callers that ignore unknown response fields require no
-changes" — and every migration to date (`001_initial.sql` through `004_curation_indexes.sql`, applied via
-`db.py::_run_migrations`'s forward-only `PRAGMA user_version` mechanism) has been additive. What is missing is
-not discipline but a *stated promise* a prospective adopter can rely on before integrating against this server,
-plus two concrete trust gaps the source analysis names directly: an at-rest encryption option
-(already flagged as a deferred future option in the existing
-[threat model notes](../privacy-and-safety.md#threat-model-notes)), and an explicit comparison
-against the cloud-hosted memory tools (mem0, Zep, and similar) that a privacy-conscious user is likely
-evaluating this project against.
+`pyproject.toml` still classifies the project as Alpha, although the implementation already follows an additive
+response-contract discipline and forward-only migrations. M12 turns that practice into an explicit compatibility
+promise, synchronizes every distribution surface for 1.0, adds an opt-in encrypted SQLite connection path, and
+publishes a factual local-first threat-model comparison.
 
 ## Scope
 
 In scope:
 
-- a written MCP response-contract and DB-schema compatibility promise;
-- a `pyproject.toml` version bump to `1.0.0` and the accompanying release-checklist update;
+- a written MCP, CLI, and DB compatibility promise;
+- a synchronized `1.0.0` release metadata update;
 - opt-in SQLCipher at-rest encryption;
-- a threat-model comparison section contrasting local-first storage with cloud memory tools;
-- README polish (a short demo funnel, built on M9's `people-context demo`).
+- a sourced threat-model comparison with cloud-hosted memory tools;
+- README demo polish built on M9's packaged demo.
 
 Non-goals:
 
-- any behavior change to existing tools, response fields, or CLI commands — this milestone documents and
-  hardens what exists; it does not redesign it;
-- making encryption the default — SQLCipher stays strictly opt-in, so the plain-SQLite trust story described in
-  [docs/decisions/0002-sqlite.md](../decisions/0002-sqlite.md) and
-  [docs/cli.md](../cli.md#direct-sqlite-access) remains the default for every existing user and every existing
-  test;
-- key management UX beyond "read a key from an environment variable" — rotation, OS-keychain integration, and
-  multi-key support are explicitly deferred past this milestone;
-- solving the deferred sync/multi-user items from [docs/design/sync.md](../design/sync.md) — this milestone's
-  compatibility promise applies to what M0–M11 actually ship, not to unbuilt future protocol surfaces.
+- redesigning existing tools or response fields;
+- making encryption the default;
+- key rotation, keychain integration, or multi-key support;
+- implementing deferred incremental sync or multi-user behavior.
 
 ## Design
 
 ### Compatibility promise
 
-A new section — either appended to [docs/mcp-interface.md](../mcp-interface.md) or a new
-`docs/compatibility.md` linked from both `README.md`'s docs table and `docs/mcp-interface.md` — states, in the
-project's existing precise/contract-oriented voice:
+Add `docs/compatibility.md`, linked from the README and `docs/mcp-interface.md`, stating:
 
-- **MCP response contracts**: within a major version, existing response fields are never removed or repurposed,
-  new fields are additive only (the `duplicate_relationships_removed` precedent becomes the *stated* rule, not
-  just an example), and existing tool names and required parameters remain stable; optional parameters may be
-  added.
-- **DB schema**: migrations are forward-only and additive within a major version — no migration drops or
-  narrows an existing column read by shipped application code — following the pattern every migration to date
-  (`adapters/sqlite/migrations/001_initial.sql` through `004_curation_indexes.sql`) already establishes, and
-  applied through the existing `PRAGMA user_version` gate in `db.py::_run_migrations`, which already skips any
-  migration numbered at or below the current version.
-- **CLI**: existing subcommands and flags keep working; new flags are additive with backward-compatible
-  defaults, matching the pattern `reindex --semantic` already set (`reindex` alone behaves exactly as it did
-  before the flag existed).
-- Explicitly out of scope of the promise (and stated as such, to avoid over-claiming): the Obsidian vault export
-  Markdown layout is documented as "deterministic" today
-  ([docs/vault-export.md](../vault-export.md)) but not yet declared a contractually stable surface — this
-  milestone should decide (see Open Questions) whether to fold it into the promise or explicitly exclude it.
+- **MCP responses:** within a major version, existing fields are not removed or repurposed; new fields are
+  additive; tool names and required parameters remain stable; optional parameters may be added with compatible
+  defaults.
+- **Database:** migrations are forward-only and additive within a major version; no migration drops or narrows a
+  column read by shipped application code.
+- **CLI:** existing commands and flags keep working; new flags are additive and preserve previous defaults.
+- **Machine-readable outputs:** a command explicitly documented as a stable JSON interface, such as the M14 brief
+  and person-index outputs, follows the same additive field rule. Human-formatted tables/Markdown remain outside
+  the frozen contract unless separately declared.
+- **Vault Markdown:** deterministic but explicitly not frozen as a compatibility surface in 1.0.
+
+Do not promise a deprecation window the project has not historically practiced.
 
 ### Version and release checklist
 
-Bump the project and classifier to `1.0.0`/Production-Stable. In the same commit, synchronize all release-version
-fields introduced by M8: `pyproject.toml` project version, top-level `server.json.version`, the `people-context`
-Registry package entry version, MCPB semantic `manifest.json.version`, and the `people-context` dependency pin in
-the bundled MCPB `pyproject.toml`. MCPB `manifest_version` is a schema-version field and remains independent. One
-parser-based CI check locates the Registry package by identifier, asserts all five release-version values match, and
-validates `manifest_version` separately. Follow the existing release procedure and add the compatibility-doc
-checklist item; do not cut the tag in this PR.
+Bump the root project and classifier to `1.0.0`/Production-Stable. In the same commit synchronize:
+
+1. `pyproject.toml` project version;
+2. top-level `server.json.version`;
+3. the `people-context` PyPI package entry version in `server.json`;
+4. MCPB semantic `mcpb/manifest.json.version`;
+5. the exact `people-context` dependency pin in `mcpb/pyproject.toml`.
+
+MCPB `manifest_version` remains an independent schema-version field and is validated against the supported MCPB
+schema, never set to the application version.
+
+Because the repository runs `uv sync --locked --all-extras` and `uv lock --check`, the same PR must regenerate and
+commit root `uv.lock`; its editable `people-context` package metadata must reflect `1.0.0`. A parser-based metadata
+test locates the Registry package by identifier rather than array position and asserts all semantic release values
+match. `uv lock --check` remains a separate generated-lock integrity gate.
+
+The compatibility package under `compat/people-context-mcp/` remains a renamed-distribution shim with its own
+post-release version. Its dependency lower bound already accepts `people-context==1.0.0`; do not falsely force the
+shim's version to match the primary distribution unless that package is intentionally republished.
+
+Follow the existing release procedure and update its checklist, but do not create the tag or live release in this
+PR.
 
 ### Opt-in SQLCipher
 
-Add a new optional dependency extra in `pyproject.toml`'s `[project.optional-dependencies]`, alongside the
-existing `semantic` extra:
+Add an optional dependency extra:
 
 ```toml
 [project.optional-dependencies]
 semantic = ["model2vec>=0.8.2,<0.9", "sqlite-vec>=0.1.9,<0.2"]
-encrypted = ["sqlcipher3-binary>=... "]  # exact binding TBD, see Open Questions
+encrypted = ["sqlcipher3-binary>=<verified-lower>,<next-breaking>"]
 ```
 
-Add a new adapter entrypoint, `adapters/sqlite/db.py::open_encrypted_db(path, key)`, distinct from — and
-additive alongside — the existing `open_db(path)` (`src/people_context/adapters/sqlite/db.py:18-46`). Every
-other adapter (`SqlitePeopleRepository`, `SqliteRecordStore`, etc.) already operates on a plain
-`sqlite3.Connection` and has no idea whether the underlying file is encrypted, so no adapter beyond `db.py`
-changes — the connection object handed to every repository/store constructor is opaque to them, as it already
-is today. `open_db`'s existing signature, default behavior, and every one of the roughly three dozen real-SQLite
-tests that call `open_db(":memory:")` remain completely unaffected, since encryption is a wholly separate
-function, not a new parameter on the existing one.
+Use `sqlcipher3-binary` unless an implementation-time wheel/platform probe demonstrates a blocker for the
+project's supported Python/OS matrix; record the exact supported platforms and pinned range. Do not silently ship
+an extra that cannot install on a claimed supported platform.
 
-Wiring: `adapters/mcp/server.py::build_server()` and `cli.py::_open_context()` both gain an explicit
-`--encrypted` flag (server) / equivalent CLI flag, which — when set — requires `PEOPLE_CONTEXT_DB_KEY` to be
-present in the process environment and calls `open_encrypted_db` instead of `open_db`; the flag's absence
-leaves both entrypoints' existing wiring untouched.
+Add `adapters/sqlite/db.py::open_encrypted_db(path, key)` alongside, not as a parameter to, `open_db(path)`. It
+must set the key before reading schema metadata or running migrations, apply the same foreign-key, WAL, busy-timeout,
+and migration setup after keying, and return the same connection interface consumed by existing repositories.
+Every plain-SQLite caller remains unchanged.
+
+`people-context-mcp --encrypted` and the global CLI form `people-context --encrypted ...` require
+`PEOPLE_CONTEXT_DB_KEY`. Without the flag, existing plaintext behavior is byte-for-byte unchanged. With the flag
+and no non-empty key, startup refuses clearly and never falls back to plaintext.
+
+Changing optional dependencies requires regenerating and committing `uv.lock`. M12.4's required validation is:
+
+```text
+uv lock --check
+uv sync --locked --all-extras
+uv run --locked ruff check .
+uv run --locked pytest -q
+```
+
+CI must actually install the encrypted extra on every platform declared supported for 1.0; tests may skip only on
+explicitly unsupported platforms documented by the release, not because the dependency was omitted from CI.
 
 ### Threat-model comparison
 
-A new subsection appended to the existing "Threat model notes" heading in
-[docs/privacy-and-safety.md](../privacy-and-safety.md#threat-model-notes), matching that section's existing
-bullet-list style, comparing this project's local-first model (data never leaves the device except the one
-explicit, announced model-download path; the server has no account, no hosted database, no telemetry) against
-the operating model of cloud-hosted memory/context tools (mem0, Zep, and similar), specifically on: where data
-is stored at rest, what a vendor breach or subpoena can expose, whether the tool can function fully offline,
-and what "delete my data" means in each model versus this project's hard `forget` semantics
-([docs/privacy-and-safety.md](../privacy-and-safety.md#forget-vs-soft-delete)). This is a documentation-only
-deliverable.
+Append a dated, sourced subsection under `docs/privacy-and-safety.md#threat-model-notes`. Compare local-first and
+cloud-hosted memory tools only on verifiable axes:
+
+- where data is stored at rest;
+- what a vendor breach or legal demand can expose;
+- whether the product functions fully offline;
+- what deletion means compared with this project's hard `forget` behavior.
+
+Use an “as of YYYY-MM-DD” note and primary vendor documentation. Keep the language factual rather than promotional.
 
 ### README polish
 
-A short "Demo" section near the top of `README.md`, between "Why" and "Quick start," walking through
-`people-context demo` (from M9) end to end with either a terminal-recording GIF or a small screenshot sequence,
-giving a prospective user something to look at before they read the architecture section.
+Add a short Demo section between “Why” and “Quick start”, showing the packaged `people-context demo` flow and its
+dedicated database. All referenced assets and commands must be link/path checked.
 
 ## Migration needs
 
-None for the compatibility promise, version bump, threat-model doc, or README polish. SQLCipher requires no
-new *migration file*, since the existing `001`–`004` migrations already run correctly against an
-`sqlcipher`-backed connection (SQLCipher is wire-compatible with the SQLite C API once the key is set); it
-requires a new *connection-open path*, not new schema.
+No new schema migration. SQLCipher changes the connection-open path, not the logical schema.
 
 ## CLI / MCP surface changes
 
-- `people-context-mcp --encrypted` (server): requires `PEOPLE_CONTEXT_DB_KEY`; server refuses to start with a
-  clear error if `--encrypted` is set without a key present, rather than silently falling back to plaintext.
-- `people-context --encrypted ...` (CLI): same requirement, applied in `_open_context()`.
-- No MCP tool changes. No response-shape changes.
+- `people-context-mcp --encrypted`;
+- global `people-context --encrypted ...`;
+- no MCP tool or response-shape changes.
 
-## Security / privacy considerations
+## Security and privacy
 
-- The encryption key is sourced **only** from `PEOPLE_CONTEXT_DB_KEY` in the process environment, never from a
-  CLI flag value — the same reasoning that already puts `PEOPLE_CONTEXT_MCP_ENABLE_SENSITIVE` and
-  `PEOPLE_CONTEXT_MCP_ENABLE_EXPORT` behind environment variables rather than tool arguments
-  (`adapters/mcp/security.py:process_elevation_enabled`) applies doubly here: a CLI flag value is visible in
-  shell history and process listings (`ps`), which a database encryption key must never be.
-- The key must never be logged, echoed, or included in any error message, audit payload, or changelog payload —
-  consistent with the existing `AGENTS.md` rule ("never log private values") and the existing precedent of
-  `set_communication_philosophy` deliberately recording only text *length* in the audit log
-  ([docs/design/sync.md §2.1](../design/sync.md#21-payloads-are-intentionally-lossy)).
-- Because SQLCipher is opt-in, the default install's existing threat model — "the database file is plaintext
-  SQLite... rely on OS-level disk encryption"
-  ([docs/privacy-and-safety.md](../privacy-and-safety.md#threat-model-notes)) — remains completely accurate and
-  unchanged for every user who does not opt in; this milestone must not imply encryption is now the default
-  posture anywhere in the docs.
-- An encrypted database's `-wal`/`-shm` companion files must also be confirmed encrypted (SQLCipher encrypts
-  WAL pages by default in recent versions, but this must be verified against the chosen binding rather than
-  assumed) — a plaintext WAL file next to an encrypted main database file would silently leak recent writes.
-- The threat-model comparison section must stay factual and sourced, not marketing copy — see Open Questions.
+- The key comes only from `PEOPLE_CONTEXT_DB_KEY`, never a flag value, config file, log, exception payload, audit
+  payload, or changelog payload.
+- Empty/whitespace-only keys are rejected.
+- Wrong-key errors are generic and never echo key material or sensitive page contents.
+- Verify that the chosen binding encrypts WAL/SHM data as configured; do not infer protection only because the main
+  database cannot be opened by plain SQLite.
+- Plain SQLite remains the default and documentation must not imply otherwise.
+- A new encrypted database and an existing encrypted database both use the same canonical migration path after the
+  key is applied.
 
 ## Testing strategy
 
-- Encryption adapter and CLI refusal tests remain as specified.
-- Existing plain-SQLite tests remain unchanged.
-- Add a distribution metadata test parsing `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and
-  `mcpb/pyproject.toml`; assert one semantic release version and treat `manifest_version` separately.
-- Documentation-only changes require link checks.
+### Compatibility and release metadata
+
+- Link checks for the compatibility document and README additions.
+- Parser-based synchronization test over `pyproject.toml`, `server.json`, `mcpb/manifest.json`, and
+  `mcpb/pyproject.toml`.
+- Assert the root package version recorded in `uv.lock` matches `pyproject.toml` and run `uv lock --check`.
+- Validate MCPB `manifest_version` separately from semantic version fields.
+
+### Encryption
+
+- missing, empty, and whitespace-only key refusal;
+- create/read/reopen encrypted database with the correct key;
+- wrong-key refusal;
+- plain `sqlite3.connect()` cannot read schema/data from the encrypted database;
+- WAL-mode writes followed by inspection proving companion files do not reveal plaintext sentinel values;
+- existing migrations run after keying;
+- server and CLI refusal without the environment key;
+- key sentinels never appear in stdout, stderr, logs, exceptions, audit rows, or changelog rows;
+- all existing `open_db` tests pass unmodified;
+- locked all-extras installation and tests run in CI.
 
 ## Open questions
 
-1. Which SQLCipher Python binding should the project standardize on — `sqlcipher3-binary` (prebuilt wheels, but
-   narrower platform coverage), `pysqlcipher3` (older, less maintained), or shelling out to a system-installed
-   `sqlcipher` CLI/library the user must provide themselves? This determines both the exact `encrypted` extra's
-   dependency list and how much platform-coverage risk this milestone takes on.
-2. Should the vault export Markdown layout be folded into the compatibility promise (giving external tooling —
-   e.g. Obsidian plugins built against it — a stability guarantee) or explicitly excluded as "deterministic but
-   not yet a frozen contract"?
-3. Should the compatibility promise commit to a specific deprecation-window policy (e.g. "a field is never
-   removed before the next major version, announced at least one minor version in advance"), or stay looser
-   given the project currently has one maintainer and no other declared consumers to coordinate with?
-4. How should the mem0/Zep comparison be kept from going stale as those products' own architectures evolve —
-   a dated "as of" note, a narrower comparison scoped to categories of risk rather than product specifics, or a
-   periodic-review commitment tied to future releases?
-5. Should `1.0.0` also require import-linter or `ruff` banned-import enforcement of the dependency rule
-   (currently "enforced by convention and code review today," per
-   [docs/architecture.md](../architecture.md#dependency-rule)), given that a 1.0 stability promise is a natural
-   point to mechanize a rule that has so far been manual?
+1. If `sqlcipher3-binary` lacks maintained wheels for a currently supported platform, should 1.0 document the
+   encrypted extra as platform-limited or defer encryption until one binding covers the supported matrix?
+2. Should a future major version freeze the vault Markdown layout, or should integrations continue to consume
+   stable JSON only?
+3. When should the dated cloud-tool comparison be reviewed for staleness?
+4. Should import-boundary enforcement become automated with import-linter or Ruff in a later hardening PR?
