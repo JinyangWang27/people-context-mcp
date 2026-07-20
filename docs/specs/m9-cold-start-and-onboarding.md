@@ -29,7 +29,7 @@ class plus a router branch," exactly as already documented in
 
 In scope:
 
-- `people-context init`: interactive CLI onboarding (optional vCard import, self-person seeding, initial
+- `people-context init`: interactive CLI onboarding (self-person seeding before optional vCard import, initial
   communication philosophy);
 - `people-context demo`: a sample dataset seeded into a dedicated, non-default database;
 - `.ics` calendar-attendee import (`source_type="ics"`);
@@ -53,23 +53,29 @@ Non-goals:
 
 A new CLI subcommand in `cli.py`, wired the same way every other subcommand is: parsed in `build_parser()`,
 dispatched in `main()`, backed by `_open_context()`'s existing `CliContext` composition
-(`src/people_context/cli.py:90`). Interactive steps:
+(`src/people_context/cli.py:90`). Interactive steps are deliberately ordered so import self-filtering is active
+before any contact file is parsed:
 
-1. Optionally prompt for a vCard export path (Google Takeout, Apple/macOS Contacts "Export vCard") and run it
+1. Prompt for the user's canonical name and zero or more email addresses/handles that may occur in exported
+   contacts. Seed the self person first via the existing `RememberPerson` use case
+   (`src/people_context/app/record.py`, exported from `people_context.app`) using
+   `RememberPersonInput(name=..., aliases=[AliasInput(value=..., kind=AliasKind.HANDLE), ...],
+   is_self=True, source="cli")`. `is_self`, handle aliases, and the single-self invariant
+   (`SelfAlreadyExistsError`) already exist. When the user chooses a vCard import but supplies no handle, print a
+   warning that the self card cannot be excluded by email; the pre-created canonical name still lets
+   `CandidateStager` match that card to the existing self person rather than create a duplicate.
+2. Optionally prompt for a vCard export path (Google Takeout, Apple/macOS Contacts "Export vCard") and run it
    through the existing `ImportContent` → `ReviewImport` → `CommitImport` use cases, unchanged — this is the
    same three-call flow already exposed as MCP tools in
-   `adapters/mcp/tools/imports.py:register`, just driven from the CLI instead of an agent.
-2. Seed a self person via the existing `RememberPerson` use case
-   (`src/people_context/app/record.py`, exported from `people_context.app`) with
-   `RememberPersonInput(name=..., is_self=True, source="cli")` — `is_self` and the single-self invariant
-   (`SelfAlreadyExistsError`) already exist and are exercised today through the `remember_person` MCP tool
-   (`src/people_context/adapters/mcp/tools/people.py:120`).
+   `adapters/mcp/tools/imports.py:register`, just driven from the CLI instead of an agent. Because the self person
+   now exists, `ImportContent._self_addresses()` supplies the seeded handles to the extractor; a card containing
+   one of them is excluded with all of its dependent candidates.
 3. Optionally prompt for a one-line communication philosophy and store it via the existing
    `SetCommunicationPhilosophy` use case (`src/people_context/app/set_communication_philosophy.py`), the same
    use case backing the `set communication_philosophy` CLI command
    (`cli.py:_cmd_set`) and the `set_communication_philosophy` MCP tool.
 
-No new port or app-layer class is required; `init` is purely a new CLI composition of four existing use cases.
+No new port or app-layer class is required; `init` is purely a new CLI composition of existing use cases.
 
 ### `people-context demo`
 
@@ -165,6 +171,10 @@ rather than inventing per-source skip fields.
 - `review_import`/`commit_import` remain the mandatory approval gate for both new sources — nothing from either
   source reaches `persons`/`affiliations`/`facts`/`interactions` without an explicit accept, unchanged from
   every existing import source.
+- `init` must create the self record before importing contacts. Seeding handle aliases first activates the
+  existing self-address exclusion; without handles, name matching must still target the pre-created self record
+  and the CLI warns that the card may appear in review. The onboarding flow must never create a second person for
+  the user merely because their own card is present in the export.
 - `people-context init` and `people-context demo` are CLI-only, matching the existing rule that vault/file
   operations and now onboarding flows stay CLI-only, human-operated actions — no MCP tool triggers a full
   contacts import or seeds a self person implicitly.
@@ -177,7 +187,10 @@ rather than inventing per-source skip fields.
 
 ## Testing strategy
 
-- App tests cover `init` and deterministic demo seeding.
+- CLI/app composition tests cover `init`, including a vCard containing the user's seeded handle (the self card
+  and its affiliation/birthday dependants are not staged) and a same-name card without a handle (it matches the
+  existing self record and cannot create a second person).
+- App tests cover deterministic demo seeding.
 - Adapter tests cover ICS/LinkedIn independence, self filtering, deduplication, and raw-content exclusion.
 - Router tests cover all five accepted source values (`email`, `mbox`, `vcard`, `ics`, `linkedin`) plus unknown.
 - MCP tests exercise the two new sources; E2E retains explicit `mbox` coverage and adds one new-source flow.
