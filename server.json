@@ -12,8 +12,7 @@
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
-      "identifier": "people-context",
-      "version": "0.1.1",
+      "identifier": "people-context-mcp",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -23,12 +22,6 @@
           "type": "named",
           "name": "--from",
           "value": "people-context"
-        }
-      ],
-      "packageArguments": [
-        {
-          "type": "positional",
-          "value": "people-context-mcp"
         }
       ]
     }

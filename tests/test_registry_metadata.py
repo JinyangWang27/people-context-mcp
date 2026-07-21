@@ -32,19 +32,28 @@ def test_server_json_uses_pinned_schema_and_recorded_namespace() -> None:
     }
 
 
-def test_server_and_package_versions_match_project_version() -> None:
+def test_server_version_tracks_project_version() -> None:
     server = _server_json()
     project_version = _project_version()
 
+    # The server release tracks the application version. The package "version" is
+    # intentionally unpinned: the run command uses `--from people-context`, so the
+    # runtime artifact version is governed by that primary distribution at release
+    # time rather than by a version on the command identifier.
     assert server["version"] == project_version
 
-    packages = server["packages"]
+
+def test_single_pypi_package_entry() -> None:
+    packages = _server_json()["packages"]
+
     assert len(packages) == 1
     package = packages[0]
     assert package["registryType"] == "pypi"
     assert package["registryBaseUrl"] == "https://pypi.org"
-    assert package["identifier"] == "people-context"
-    assert package["version"] == project_version
+    # The identifier is the console-script command uvx executes. The server script
+    # `people-context-mcp` differs from the primary distribution name, so the
+    # identifier is the command and `--from people-context` installs the primary.
+    assert package["identifier"] == "people-context-mcp"
 
 
 def test_package_transport_is_valid_stdio() -> None:
@@ -53,18 +62,48 @@ def test_package_transport_is_valid_stdio() -> None:
     assert package["transport"] == {"type": "stdio"}
 
 
+def _reconstruct_command(package: dict) -> list[str]:
+    """Reconstruct the shell command a client assembles from the package entry.
+
+    Clients place the package identifier between runtimeArguments and
+    packageArguments: ``<runtimeHint> <runtimeArguments> <identifier> <packageArguments>``.
+    """
+
+    def tokens(arguments: list[dict]) -> list[str]:
+        rendered: list[str] = []
+        for argument in arguments:
+            if argument["type"] == "named":
+                rendered.append(argument["name"])
+                if "value" in argument:
+                    rendered.append(argument["value"])
+            else:
+                rendered.append(argument["value"])
+        return rendered
+
+    command = [package["runtimeHint"]]
+    command += tokens(package.get("runtimeArguments", []))
+    command.append(package["identifier"])
+    command += tokens(package.get("packageArguments", []))
+    return command
+
+
 def test_package_reconstructs_canonical_uvx_invocation() -> None:
     package = _server_json()["packages"][0]
 
     assert package["runtimeHint"] == "uvx"
-    assert package["runtimeArguments"] == [{"type": "named", "name": "--from", "value": "people-context"}]
-    assert package["packageArguments"] == [{"type": "positional", "value": "people-context-mcp"}]
+    # The identifier is inserted as the executed command, so a redundant identifier
+    # must not also appear in packageArguments.
+    assert "packageArguments" not in package
+    assert _reconstruct_command(package) == ["uvx", "--from", "people-context", "people-context-mcp"]
 
 
-def test_packaged_readme_carries_ownership_marker() -> None:
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+def test_ownership_marker_present_in_repository_and_identifier_package_readmes() -> None:
+    marker = f"<!-- mcp-name: {REGISTRY_NAMESPACE} -->"
 
-    assert f"<!-- mcp-name: {REGISTRY_NAMESPACE} -->" in readme
+    # Repository README (the primary distribution's packaged long description).
+    assert marker in (ROOT / "README.md").read_text(encoding="utf-8")
+    # The `identifier` package's packaged README, which the Registry links on PyPI.
+    assert marker in (ROOT / "compat/people-context-mcp/README.md").read_text(encoding="utf-8")
 
 
 def test_glama_metadata_is_well_formed() -> None:

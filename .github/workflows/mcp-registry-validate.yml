@@ -54,7 +54,7 @@ jobs:
       - name: Validate server.json against the pinned Registry schema
         run: ./mcp-publisher validate server.json
 
-      - name: Assert server and package versions match pyproject
+      - name: Assert server metadata reconstructs the canonical command
         run: |
           python3 - <<'PY'
           import json
@@ -69,12 +69,30 @@ jobs:
           assert len(packages) == 1, packages
           package = packages[0]
           assert package["registryType"] == "pypi", package
-          assert package["identifier"] == "people-context", package
-          assert package["version"] == project_version, (package["version"], project_version)
+          assert package["identifier"] == "people-context-mcp", package
           assert package["transport"] == {"type": "stdio"}, package
 
-          expected_marker = f"<!-- mcp-name: {server['name']} -->"
-          readme = Path("README.md").read_text(encoding="utf-8")
-          assert expected_marker in readme, expected_marker
-          print("server.json version/package/marker checks passed")
+          def tokens(arguments):
+              rendered = []
+              for argument in arguments:
+                  if argument["type"] == "named":
+                      rendered.append(argument["name"])
+                      if "value" in argument:
+                          rendered.append(argument["value"])
+                  else:
+                      rendered.append(argument["value"])
+              return rendered
+
+          command = (
+              [package["runtimeHint"]]
+              + tokens(package.get("runtimeArguments", []))
+              + [package["identifier"]]
+              + tokens(package.get("packageArguments", []))
+          )
+          assert command == ["uvx", "--from", "people-context", "people-context-mcp"], command
+
+          marker = f"<!-- mcp-name: {server['name']} -->"
+          for readme in ("README.md", "compat/people-context-mcp/README.md"):
+              assert marker in Path(readme).read_text(encoding="utf-8"), readme
+          print("server.json command reconstruction and marker checks passed")
           PY
