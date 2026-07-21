@@ -231,10 +231,8 @@ writing live in adapters. One composition root wires both stdio and HTTP.
 
 ## Contributing
 
-- Keep domain/app independent of SQLite, MCP, and filesystem adapters.
-- Use narrow Protocol ports and fake-port tests for app behavior.
-- Run `uv run ruff check .` and `uv run pytest -q`.
-- Line length is 120.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for issue and private-security reporting, architecture constraints,
+validation commands, and the pull-request review process.
 
 ## License
 

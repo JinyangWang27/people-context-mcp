@@ -1,0 +1,9 @@
+{
+  "name": "people-context-claude-code-tooling",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Integrity-locked Claude Code tooling for repository validation.",
+  "dependencies": {
+    "@anthropic-ai/claude-code": "2.1.214"
+  }
+}
