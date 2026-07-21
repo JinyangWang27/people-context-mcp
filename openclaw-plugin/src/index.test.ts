@@ -29,6 +29,9 @@ describe("people-context plugin", () => {
     expect(
       serverUrl({ baseUrl: "http://localhost:9000/", path: "/people/mcp" }).toString(),
     ).toBe("http://localhost:9000/people/mcp");
+    expect(
+      serverUrl({ baseUrl: "http://localhost:9000////", path: "///people/mcp" }).toString(),
+    ).toBe("http://localhost:9000/people/mcp");
   });
 
   it("prefers structured content and parses JSON text", () => {

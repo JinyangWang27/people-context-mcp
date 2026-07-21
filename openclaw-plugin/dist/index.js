@@ -12,8 +12,15 @@ const configSchema = Type.Object({
         default: "/mcp",
     })),
 }, { additionalProperties: false });
+function stripTrailingSlashes(value) {
+    let endIndex = value.length;
+    while (endIndex > 0 && value[endIndex - 1] === "/") {
+        endIndex -= 1;
+    }
+    return value.slice(0, endIndex);
+}
 export function serverUrl(config) {
-    const base = (config.baseUrl ?? "http://127.0.0.1:8765").replace(/\/+$/, "");
+    const base = stripTrailingSlashes(config.baseUrl ?? "http://127.0.0.1:8765");
     const path = (config.path ?? "/mcp").replace(/^\/+/, "");
     return new URL(`${base}/${path}`);
 }
