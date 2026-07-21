@@ -120,3 +120,7 @@ def test_release_workflow_attaches_the_bundle() -> None:
     assert "gh release upload" in workflow
     # The upload job takes least-privilege write scope only where it is needed.
     assert "contents: write" in workflow
+    # The bundle pins people-context==<release>, so it must be attached only after
+    # the primary PyPI publication succeeds — not in parallel with it — otherwise a
+    # downloaded bundle fails to install until (or unless) that version is on PyPI.
+    assert "needs: publish" in workflow

@@ -70,7 +70,13 @@ jobs:
 
   bundle:
     name: Attach native-UV MCPB bundle to the release
-    needs: build
+    # Wait for the primary PyPI publication: the bundle pins
+    # people-context==<release>, so the .mcpb must not be attached (and become
+    # downloadable) until that version actually exists on PyPI. `publish` is gated
+    # by the `pypi` environment approval, so `needs: build` alone would attach an
+    # uninstallable bundle during the approval window, or permanently if the
+    # publish fails.
+    needs: publish
     runs-on: ubuntu-latest
     permissions:
       contents: write
