@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from pathlib import Path
 
@@ -139,7 +140,15 @@ def test_registry_validation_workflow_pins_the_publisher() -> None:
 
     assert 'MCP_PUBLISHER_VERSION: "v1.8.0"' in workflow
     assert "mcp-publisher validate server.json" in workflow
+    # The archive is verified against a repository-pinned immutable digest, not the
+    # release's own (tag-controlled) checksums file.
+    match = re.search(r'MCP_PUBLISHER_SHA256:\s*"([0-9a-f]{64})"', workflow)
+    assert match is not None, "workflow must pin a 64-hex SHA256 digest"
+    assert "${MCP_PUBLISHER_SHA256}  ${archive}" in workflow
     assert "sha256sum --check --strict" in workflow
+    # The publication docs must reuse the same pinned digest.
+    docs = (ROOT / "docs/mcp-registry.md").read_text(encoding="utf-8")
+    assert match.group(1) in docs
 
 
 def test_registry_matrix_document_lists_every_directory() -> None:

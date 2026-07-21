@@ -81,10 +81,12 @@ long description) and the identifier package's
 
 ## Pinned validator
 
-Validation uses the Registry's own `mcp-publisher` CLI, pinned to an exact reviewed release
-(`v1.8.0`). The `.github/workflows/mcp-registry-validate.yml` workflow downloads that immutable release, verifies the
-binary against the release's own signed `checksums.txt`, and runs `mcp-publisher validate server.json`. No floating
-`latest` CLI is installed. Bumping the validator is a reviewed change to `MCP_PUBLISHER_VERSION` in that workflow.
+Validation uses the Registry's own `mcp-publisher` CLI, pinned to an exact reviewed release (`v1.8.0`). Because
+release tags are mutable, the `.github/workflows/mcp-registry-validate.yml` workflow verifies the downloaded archive
+against a repository-pinned immutable content digest (`MCP_PUBLISHER_SHA256`) — not the release's own checksums
+file, which an asset swap could rewrite in lockstep — before executing the binary and running
+`mcp-publisher validate server.json`. No floating `latest` CLI is installed. Bumping the validator is a reviewed
+change to both `MCP_PUBLISHER_VERSION` and `MCP_PUBLISHER_SHA256` in that workflow.
 
 ## Publication (manual, account-owner step)
 
@@ -101,18 +103,33 @@ root `project.version` does **not** republish the compatibility package: its ver
 README stays on PyPI. `mcp-publisher publish` would then still fail package validation. Successful PyPI publication
 of a marker-bearing `people-context-mcp` release must therefore precede publication:
 
-1. Bump `project.version`, and **also bump the `version` in `compat/people-context-mcp/pyproject.toml`** so
-   `skip-existing` uploads a fresh compatibility artifact. Keep the `mcp-name:` marker in both the `people-context`
-   and `people-context-mcp` packaged READMEs. Merge.
+1. Bump `project.version`; **also bump the `version` in `compat/people-context-mcp/pyproject.toml`** so
+   `skip-existing` uploads a fresh compatibility artifact; and **update `server.json` in the same commit** — set the
+   top-level `version` and the `--from people-context==<version>` pin to the new release. (The synchronization
+   assertions in `tests/test_registry_metadata.py` fail the build if `server.json` is left behind.) Keep the
+   `mcp-name:` marker in both the `people-context` and `people-context-mcp` packaged READMEs. Merge.
 2. Cut the GitHub Release so `release.yml` uploads the new marker-bearing artifacts — including the bumped
    `people-context-mcp` — to PyPI, and wait for that publication to complete.
-3. Only then run the Registry publication:
+3. Install the pinned publisher, verified against the same immutable digest the CI job uses, and invoke that binary
+   explicitly (it is not otherwise on `PATH`):
 
    ```bash
-   # Pinned to the reviewed release; do not use a floating tag.
-   mcp-publisher login github
-   mcp-publisher validate server.json
-   mcp-publisher publish
+   # Keep in sync with .github/workflows/mcp-registry-validate.yml.
+   MCP_PUBLISHER_VERSION="v1.8.0"
+   MCP_PUBLISHER_SHA256="1370446bbe74d562608e8005a6ccce02d146a661fbd78674e11cc70b9618d6cf"
+   archive="mcp-publisher_linux_amd64.tar.gz"  # pick the asset for your platform
+   curl -fLsS -o "$archive" \
+     "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/${archive}"
+   echo "${MCP_PUBLISHER_SHA256}  ${archive}" | sha256sum --check --strict -
+   tar -xzf "$archive" mcp-publisher
+   ```
+
+4. Only then run the Registry publication with that pinned binary:
+
+   ```bash
+   ./mcp-publisher login github
+   ./mcp-publisher validate server.json
+   ./mcp-publisher publish
    ```
 
 `mcp-publisher login github` performs the GitHub OAuth device flow that proves control of the
