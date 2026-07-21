@@ -36,10 +36,7 @@ def test_server_version_tracks_project_version() -> None:
     server = _server_json()
     project_version = _project_version()
 
-    # The server release tracks the application version. The package "version" is
-    # intentionally unpinned: the run command uses `--from people-context`, so the
-    # runtime artifact version is governed by that primary distribution at release
-    # time rather than by a version on the command identifier.
+    # The server release tracks the application version.
     assert server["version"] == project_version
 
 
@@ -89,12 +86,36 @@ def _reconstruct_command(package: dict) -> list[str]:
 
 def test_package_reconstructs_canonical_uvx_invocation() -> None:
     package = _server_json()["packages"][0]
+    project_version = _project_version()
 
     assert package["runtimeHint"] == "uvx"
     # The identifier is inserted as the executed command, so a redundant identifier
     # must not also appear in packageArguments.
     assert "packageArguments" not in package
-    assert _reconstruct_command(package) == ["uvx", "--from", "people-context", "people-context-mcp"]
+    # The `--from` primary is pinned to the server version so each versioned Registry
+    # entry installs a reproducible artifact instead of whatever release is latest.
+    assert _reconstruct_command(package) == [
+        "uvx",
+        "--from",
+        f"people-context=={project_version}",
+        "people-context-mcp",
+    ]
+
+
+def test_pinned_primary_requirement_stays_synchronized() -> None:
+    package = _server_json()["packages"][0]
+    project_version = _project_version()
+
+    (from_argument,) = [
+        argument
+        for argument in package.get("runtimeArguments", [])
+        if argument.get("name") == "--from"
+    ]
+    requirement = from_argument["value"]
+    name, _, pinned_version = requirement.partition("==")
+    assert name == "people-context"
+    # Pin must equal the server version; bumping the release must bump this in lockstep.
+    assert pinned_version == project_version == _server_json()["version"]
 
 
 def test_ownership_marker_present_in_repository_and_identifier_package_readmes() -> None:

@@ -89,7 +89,8 @@ jobs:
               + [package["identifier"]]
               + tokens(package.get("packageArguments", []))
           )
-          assert command == ["uvx", "--from", "people-context", "people-context-mcp"], command
+          expected = ["uvx", "--from", f"people-context=={project_version}", "people-context-mcp"]
+          assert command == expected, (command, expected)
 
           marker = f"<!-- mcp-name: {server['name']} -->"
           for readme in ("README.md", "compat/people-context-mcp/README.md"):

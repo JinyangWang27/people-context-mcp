@@ -48,25 +48,31 @@ whose own `people-context` console script is the human CLI, not the server. So t
 
 - `identifier`: `people-context-mcp` — the console-script command `uvx` executes;
 - `runtimeHint`: `uvx`;
-- `runtimeArguments`: `--from people-context` — installs the active primary distribution, whose
-  `people-context-mcp` script is the server.
+- `runtimeArguments`: `--from people-context==<server version>` — installs the active primary distribution pinned
+  to the server version, whose `people-context-mcp` script is the server.
 
-This reconstructs exactly the documented canonical invocation:
+This reconstructs the documented invocation, pinned for reproducibility:
 
 ```
-uvx --from people-context people-context-mcp
+uvx --from people-context==0.1.1 people-context-mcp
 ```
 
 The command identifier must not also be repeated in `packageArguments`; doing so would assemble
 `uvx --from people-context people-context people-context-mcp`, which runs the `people-context` CLI with a stray
 argument instead of the server.
 
-The package `version` is intentionally omitted: the command installs the primary via `--from people-context`, so
-the runtime artifact version is governed by that distribution's release rather than by a version pinned on the
-command identifier (pinning `people-context-mcp==<primary version>` would not resolve, since the compatibility
-distribution carries its own version line). The reconstructed command, the single stdio PyPI entry, and the
-ownership markers are asserted both in CI (`.github/workflows/mcp-registry-validate.yml`) and in
-`tests/test_registry_metadata.py`.
+**Reproducible version selection.** A Registry entry is a versioned snapshot, so the primary requirement is pinned
+with `==<server version>` rather than left to resolve to the latest release. This keeps a client that selects the
+historical `0.1.1` Registry entry on `people-context` `0.1.1` code and contracts, honouring the same-version
+package contract in [docs/specs/m8-distribution-and-reach.md](specs/m8-distribution-and-reach.md) and the
+synchronization assumptions in [docs/specs/m12-trust-stability-v1.md](specs/m12-trust-stability-v1.md). Because the
+console-script name differs from the distribution name, the same-version guarantee is expressed through this pinned
+`--from` primary (whose installed version equals the server version) rather than through a `version` on the command
+`identifier` — pinning `people-context-mcp==<server version>` would not resolve, since the compatibility
+distribution carries an independent version line. The pinned `--from` value, the reconstructed command, the single
+stdio PyPI entry, and the ownership markers are asserted — and kept in lockstep with the server version — both in CI
+(`.github/workflows/mcp-registry-validate.yml`) and in `tests/test_registry_metadata.py`. **Every server version
+bump must update this `==` pin together with the top-level `version`.**
 
 Because the Registry links a PyPI package to the server through a `mcp-name:` marker in that package's published
 README, the marker is committed to both the repository-root [README.md](../README.md) (the `people-context`
@@ -85,16 +91,21 @@ binary against the release's own signed `checksums.txt`, and runs `mcp-publisher
 Actual Registry publication is a manual release step that requires interactive GitHub authentication and therefore
 is **out of scope for automation in this PR** (M8.2 excludes live publication/approval).
 
-**Prerequisite — publish the matching PyPI artifact first.** The Registry validates a PyPI package by fetching its
-published README and confirming the `mcp-name:` marker. `docs/releasing.md` uploads artifacts only when the
-GitHub Release workflow runs, and the currently published `people-context` and `people-context-mcp` artifacts were
-built before this ownership marker existed. Registry publication therefore cannot succeed against them. Successful
-PyPI publication of a marker-bearing release must precede `mcp-publisher publish`:
+**Prerequisite — publish a marker-bearing `people-context-mcp` artifact first.** The Registry validates the package
+named by `identifier` (`people-context-mcp`) by fetching its published PyPI README and confirming the `mcp-name:`
+marker. `docs/releasing.md` uploads artifacts only when the GitHub Release workflow runs, and the currently
+published `people-context-mcp` `0.1.0.post1` artifact predates this ownership marker. Crucially, bumping only the
+root `project.version` does **not** republish the compatibility package: its version in
+[compat/people-context-mcp/pyproject.toml](../compat/people-context-mcp/pyproject.toml) is a fixed line, and
+`release.yml` uploads it with `skip-existing: true`, so an unchanged version is skipped and the old marker-less
+README stays on PyPI. `mcp-publisher publish` would then still fail package validation. Successful PyPI publication
+of a marker-bearing `people-context-mcp` release must therefore precede publication:
 
-1. Bump `project.version`, keep the `mcp-name:` marker in both the `people-context` and `people-context-mcp`
-   packaged READMEs, and merge.
-2. Cut the GitHub Release so `release.yml` uploads the new marker-bearing artifacts to PyPI, and wait for that
-   publication to complete.
+1. Bump `project.version`, and **also bump the `version` in `compat/people-context-mcp/pyproject.toml`** so
+   `skip-existing` uploads a fresh compatibility artifact. Keep the `mcp-name:` marker in both the `people-context`
+   and `people-context-mcp` packaged READMEs. Merge.
+2. Cut the GitHub Release so `release.yml` uploads the new marker-bearing artifacts — including the bumped
+   `people-context-mcp` — to PyPI, and wait for that publication to complete.
 3. Only then run the Registry publication:
 
    ```bash
@@ -116,7 +127,7 @@ alone; entries marked *repository* are driven by files committed here.
 
 | Directory | Primary documentation | Submission path | Required in-repo metadata | Package / transport representation | Ownership / auth step | Live publication |
 |---|---|---|---|---|---|---|
-| **MCP Registry** | https://github.com/modelcontextprotocol/registry (`docs/`) | Repository metadata + `mcp-publisher` | [`server.json`](../server.json) (schema `2025-12-11`) and the `mcp-name:` marker in both packaged READMEs | PyPI `stdio` entry; `uvx --from people-context people-context-mcp` | GitHub OAuth via `mcp-publisher login github` proves `io.github.jinyangwang27` | Manual `mcp-publisher publish` after the marker-bearing PyPI artifact is live |
+| **MCP Registry** | https://github.com/modelcontextprotocol/registry (`docs/`) | Repository metadata + `mcp-publisher` | [`server.json`](../server.json) (schema `2025-12-11`) and the `mcp-name:` marker in both packaged READMEs | PyPI `stdio` entry; `uvx --from people-context==<server version> people-context-mcp` | GitHub OAuth via `mcp-publisher login github` proves `io.github.jinyangwang27` | Manual `mcp-publisher publish` after the marker-bearing PyPI artifact is live |
 | **Smithery** | https://smithery.ai/docs | Manual (authenticated GitHub claim; Smithery indexes the repo/README) | None required for a local `stdio` server; the canonical invocation and description come from README/`server.json` | Documented as local `uvx` stdio; Smithery's hosted-deployment model does not apply to this local-first server | Claim the server in the Smithery dashboard using the `JinyangWang27` GitHub account | Manual claim/listing by the account owner |
 | **PulseMCP** | https://www.pulsemcp.com/submit | Manual (submission form / crawler) | None; PulseMCP ingests GitHub and Registry metadata | Reuses the Registry `server.json` package/transport once published | Submit the GitHub URL from the `JinyangWang27` account | Manual form submission by the account owner |
 | **mcp.so** | https://mcp.so/submit | Manual (submission form; consumes Registry) | None; mcp.so consumes the published Registry entry and README | Reuses the Registry `server.json` package/transport once published | Submit the GitHub/Registry URL | Manual form submission by the account owner |
