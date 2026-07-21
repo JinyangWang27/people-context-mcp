@@ -6,6 +6,7 @@ on:
       - ".claude-plugin/**"
       - "docs/claude-code-plugin.md"
       - ".github/workflows/claude-plugin-validate.yml"
+      - ".github/tooling/claude-code/**"
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
@@ -18,6 +19,7 @@ on:
       - ".claude-plugin/**"
       - "docs/claude-code-plugin.md"
       - ".github/workflows/claude-plugin-validate.yml"
+      - ".github/tooling/claude-code/**"
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
@@ -42,11 +44,12 @@ jobs:
           node-version: "22"
           package-manager-cache: false
 
-      - name: Install Claude Code
-        run: npm install --global @anthropic-ai/claude-code@2.1.214
+      - name: Install Claude Code tooling
+        working-directory: .github/tooling/claude-code
+        run: npm ci --no-audit --no-fund
 
       - name: Validate marketplace and plugin
-        run: claude plugin validate . --strict
+        run: .github/tooling/claude-code/node_modules/.bin/claude plugin validate . --strict
 
       - name: Install uv
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2

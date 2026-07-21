@@ -44,6 +44,7 @@
     "typebox": "^1.1.38"
   },
   "devDependencies": {
+    "fast-check": "4.9.0",
     "openclaw": "^2026.7.1",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
