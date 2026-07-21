@@ -41,11 +41,13 @@ jobs:
       - name: Install pinned mcp-publisher
         run: |
           set -euo pipefail
+          version="${MCP_PUBLISHER_VERSION#v}"
           base="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
           archive="mcp-publisher_linux_amd64.tar.gz"
+          checksums="registry_${version}_checksums.txt"
           curl --fail --location --silent --show-error --retry 3 --output "${archive}" "${base}/${archive}"
-          curl --fail --location --silent --show-error --retry 3 --output checksums.txt "${base}/checksums.txt"
-          grep " ${archive}\$" checksums.txt | sha256sum --check --strict -
+          curl --fail --location --silent --show-error --retry 3 --output "${checksums}" "${base}/${checksums}"
+          grep " ${archive}\$" "${checksums}" | sha256sum --check --strict -
           tar --extract --gzip --file "${archive}" mcp-publisher
           ./mcp-publisher --version
 
