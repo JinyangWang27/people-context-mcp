@@ -10,7 +10,7 @@ import pytest
 
 from people_context import cli
 from people_context.adapters.sqlite import SqliteAuditLog, SqliteGraphReader, SqlitePeopleRepository, open_db
-from people_context.app import AliasInput, RememberPerson, RememberPersonInput
+from people_context.app import AliasInput, ImportReviewRow, RememberPerson, RememberPersonInput
 from people_context.domain.person import AliasKind, Person
 from people_context.domain.preferences import PREF_COMMUNICATION_PHILOSOPHY
 from people_context.ports.clock import SystemClock
@@ -280,6 +280,91 @@ def test_init_no_handle_same_name_vcard_targets_self_and_warns_before_import(
         conn.close()
 
 
+def test_init_expands_home_in_preflighted_vcard_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    home = tmp_path / "home"
+    home.mkdir()
+    vcard_path = home / "contacts.vcf"
+    vcard_path.write_text("BEGIN:VCARD\nVERSION:4.0\nFN:Alice\nEND:VCARD\n", encoding="utf-8")
+    db_path = tmp_path / "expanded.db"
+    monkeypatch.setenv("HOME", str(home))
+
+    def answer(prompt: str) -> str:
+        if prompt.startswith("Canonical"):
+            return "Maya"
+        if prompt.startswith("Email"):
+            return ""
+        if prompt.startswith("vCard"):
+            return "~/contacts.vcf"
+        if prompt.startswith("Candidate IDs"):
+            conn = open_db(db_path)
+            try:
+                return ",".join(row[0] for row in conn.execute("SELECT id FROM import_staging"))
+            finally:
+                conn.close()
+        if prompt.startswith("Communication"):
+            return ""
+        raise AssertionError(prompt)
+
+    monkeypatch.setattr("builtins.input", answer)
+    assert cli.main(["--db", str(db_path), "init"]) == 0
+    conn = open_db(db_path)
+    try:
+        names = [row[0] for row in conn.execute("SELECT canonical_name FROM persons ORDER BY canonical_name")]
+    finally:
+        conn.close()
+    assert names == ["Alice", "Maya"]
+
+
+def test_import_review_identifies_dependent_candidate_owners(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    rows = [
+        ImportReviewRow(
+            id="person-alice",
+            source="import/vcard",
+            status="pending",
+            candidate={"type": "person", "name": "Alice"},
+        ),
+        ImportReviewRow(
+            id="person-bob",
+            source="import/vcard",
+            status="pending",
+            candidate={"type": "person", "name": "Bob"},
+        ),
+        ImportReviewRow(
+            id="affiliation-alice",
+            source="import/vcard",
+            status="pending",
+            candidate={
+                "type": "affiliation",
+                "person_candidate_id": "person-alice",
+                "org": "Acme",
+                "role": "Engineer",
+            },
+        ),
+        ImportReviewRow(
+            id="fact-bob",
+            source="import/vcard",
+            status="pending",
+            candidate={
+                "type": "fact",
+                "person_candidate_id": "person-bob",
+                "predicate": "birthday",
+                "value": "1990-01-01",
+            },
+        ),
+    ]
+
+    cli._print_import_review(rows)
+
+    output = capsys.readouterr().out
+    assert "affiliation-alice  affiliation  Engineer at Acme — Alice (person-alice)" in output
+    assert "fact-bob  fact  birthday=1990-01-01 — Bob (person-bob)" in output
+
+
 def test_init_rejects_unknown_candidate_ids_without_committing_contacts(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -378,3 +463,32 @@ def test_demo_refuses_existing_without_reset_then_reseeds_deterministic_connecte
         conn.close()
     assert path is not None
     assert [person.name for person in path.people] == ["Maya Chen", "Daniel Okafor", "Amina Hassan", "Sofia Alvarez"]
+
+
+def test_demo_reset_replaces_symlink_without_touching_its_target(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_home = tmp_path / "data"
+    demo_path = data_home / "people-context" / "demo.db"
+    demo_path.parent.mkdir(parents=True)
+    real_db = tmp_path / "real.db"
+    real_person = _seed(real_db, "Real Person")
+    demo_path.symlink_to(real_db)
+    monkeypatch.setenv("XDG_DATA_HOME", str(data_home))
+
+    assert cli.main(["demo", "--reset"]) == 0
+
+    assert not demo_path.is_symlink()
+    conn = open_db(real_db)
+    try:
+        real_names = [row[0] for row in conn.execute("SELECT canonical_name FROM persons")]
+        assert SqlitePeopleRepository(conn).get(real_person.id) is not None
+    finally:
+        conn.close()
+    assert real_names == ["Real Person"]
+    conn = open_db(demo_path)
+    try:
+        assert conn.execute("SELECT COUNT(*) FROM persons").fetchone()[0] == 4
+    finally:
+        conn.close()

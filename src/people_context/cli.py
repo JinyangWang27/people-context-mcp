@@ -340,9 +340,12 @@ def _cmd_init(ctx: CliContext) -> int:
         return 2
     if not _preflight_init_aliases(ctx, target, aliases):
         return 1
-    vcard_path = input("vCard path (leave blank to skip): ").strip()
-    if vcard_path and not _preflight_vcard_path(vcard_path):
-        return 1
+    raw_vcard_path = input("vCard path (leave blank to skip): ").strip()
+    vcard_path: Path | None = None
+    if raw_vcard_path:
+        vcard_path = _preflight_vcard_path(raw_vcard_path)
+        if vcard_path is None:
+            return 1
 
     remember = RememberPerson(ctx.repo, ctx.repo, ctx.audit, ctx.clock)
     try:
@@ -424,8 +427,8 @@ def _preflight_init_aliases(ctx: CliContext, target: Person | None, aliases: lis
     return True
 
 
-def _preflight_vcard_path(raw_path: str) -> bool:
-    path = Path(raw_path).expanduser()
+def _preflight_vcard_path(raw_path: str) -> Path | None:
+    path = Path(raw_path).expanduser().absolute()
     try:
         if not path.is_file():
             raise OSError("path is not a readable file")
@@ -433,11 +436,11 @@ def _preflight_vcard_path(raw_path: str) -> bool:
             handle.read(1)
     except OSError as exc:
         print(f"Cannot read vCard file: {exc}", file=sys.stderr)
-        return False
-    return True
+        return None
+    return path
 
 
-def _run_init_vcard_import(ctx: CliContext, path: str, self_person: Person) -> int:
+def _run_init_vcard_import(ctx: CliContext, path: Path, self_person: Person) -> int:
     handles = [alias.value for alias in self_person.aliases if alias.kind == AliasKind.HANDLE]
     if not handles:
         print(
@@ -457,7 +460,7 @@ def _run_init_vcard_import(ctx: CliContext, path: str, self_person: Person) -> i
         RecordFact(ctx.repo, records, ctx.audit, ctx.clock),
     )
     try:
-        batch = importer.execute("vcard", path=path)
+        batch = importer.execute("vcard", path=str(path))
         review = reviewer.execute(batch.batch_id)
     except ImportPipelineError as exc:
         if exc.code == "no_candidates":
@@ -490,6 +493,11 @@ def _run_init_vcard_import(ctx: CliContext, path: str, self_person: Person) -> i
 
 def _print_import_review(rows: list[ImportReviewRow]) -> None:
     print("Import candidates:")
+    person_names = {
+        row.id: str(row.candidate["name"])
+        for row in rows
+        if row.candidate["type"] == "person"
+    }
     for row in rows:
         candidate_id = row.id
         candidate = row.candidate
@@ -497,18 +505,24 @@ def _print_import_review(rows: list[ImportReviewRow]) -> None:
         if candidate_type == "person":
             detail = candidate["name"]
         elif candidate_type == "affiliation":
-            detail = f"{candidate['role']} at {candidate['org']}"
+            detail = f"{candidate['role']} at {candidate['org']} — {_import_owner(candidate, person_names)}"
         elif candidate_type == "fact":
-            detail = f"{candidate['predicate']}={candidate['value']}"
+            detail = f"{candidate['predicate']}={candidate['value']} — {_import_owner(candidate, person_names)}"
         else:
             detail = "summary-only interaction"
         print(f"  {candidate_id}  {candidate_type}  {detail}")
 
 
+def _import_owner(candidate: dict[str, object], person_names: dict[str, str]) -> str:
+    person_candidate_id = str(candidate["person_candidate_id"])
+    person_name = str(person_names.get(person_candidate_id, "unknown person"))
+    return f"{person_name} ({person_candidate_id})"
+
+
 def _cmd_demo(args: argparse.Namespace) -> int:
     """Create only the dedicated fictional demo database."""
     demo_path = _demo_db_path()
-    if demo_path.exists() and not args.reset:
+    if _existing_demo_files(demo_path) and not args.reset:
         print(f"Demo database already exists: {demo_path}. Use --reset to replace it.", file=sys.stderr)
         return 1
     if args.reset:
@@ -530,12 +544,20 @@ def _demo_db_path(env: dict[str, str] | None = None) -> Path:
     else:
         home = values.get("HOME")
         base = Path(home).expanduser() / ".local" / "share" if home else Path.home() / ".local" / "share"
-    return (base / "people-context" / _DEMO_FILENAME).resolve()
+    return Path(os.path.abspath(base / "people-context" / _DEMO_FILENAME))
+
+
+def _existing_demo_files(demo_path: Path) -> list[Path]:
+    return [path for path in _demo_files(demo_path) if os.path.lexists(path)]
 
 
 def _remove_demo_files(demo_path: Path) -> None:
-    for path in (demo_path, Path(f"{demo_path}-wal"), Path(f"{demo_path}-shm")):
+    for path in _demo_files(demo_path):
         path.unlink(missing_ok=True)
+
+
+def _demo_files(demo_path: Path) -> tuple[Path, Path, Path]:
+    return demo_path, Path(f"{demo_path}-wal"), Path(f"{demo_path}-shm")
 
 
 def _seed_demo(ctx: CliContext) -> dict[str, Person]:

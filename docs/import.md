@@ -148,7 +148,8 @@ Email/mbox arrived in **M3**; vCard and strict agent staging are delivered in **
 LinkedIn Connections CSV imports arrived in **M9**. LinkedIn import requires the canonical `First Name`, `Last Name`,
 `URL`, `Email Address`, `Company`, `Position`, and `Connected On` headers while allowing extra columns. It coalesces
 rows only by normalized email, stages affiliations only when company and position are both present, and accepts
-connected dates as `DD Mon YYYY` or `YYYY-MM-DD`. Profile URLs, notes, and other free text are never staged.
+connected dates as `DD Mon YYYY` or `YYYY-MM-DD`. The export's notice preamble is discarded before the canonical
+header; profile URLs, notes, and other free text are never staged.
 
 Email extraction uses
 only From/To/Cc/Reply-To, Subject, Date, and Message-ID headers;

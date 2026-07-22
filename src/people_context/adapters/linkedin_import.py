@@ -77,7 +77,7 @@ class LinkedInImportExtractor:
                 "linkedin import requires exactly one of content or path",
             )
         text = content.lstrip("\ufeff") if content is not None else Path(path or "").read_text(encoding="utf-8-sig")
-        reader = csv.DictReader(io.StringIO(text), strict=True)
+        reader = csv.DictReader(io.StringIO(_csv_from_canonical_header(text)), strict=True)
         headers = reader.fieldnames
         if headers is None or not _EXPECTED_HEADERS.issubset(headers):
             raise ImportExtractionError("invalid_headers", "linkedin CSV is missing required canonical headers")
@@ -158,6 +158,18 @@ class LinkedInImportExtractor:
             candidates=[*candidates, *affiliations, *facts],
             skipped_cards=skipped,
         )
+
+
+def _csv_from_canonical_header(text: str) -> str:
+    lines = text.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        try:
+            columns = next(csv.reader([line], strict=True))
+        except csv.Error:
+            continue
+        if _EXPECTED_HEADERS.issubset(columns):
+            return "".join(lines[index:])
+    raise ImportExtractionError("invalid_headers", "linkedin CSV is missing required canonical headers")
 
 
 def _combined_name(row: dict[str | None, str | list[str] | None]) -> str:

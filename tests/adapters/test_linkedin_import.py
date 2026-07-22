@@ -82,6 +82,30 @@ def test_linkedin_accepts_bom_header_superset_dates_and_omits_raw_fields() -> No
     assert _NOTE_SENTINEL not in repr(extracted)
 
 
+def test_linkedin_discards_real_export_notes_preamble_before_canonical_header() -> None:
+    preamble_sentinel = "LINKEDIN-PREAMBLE-MUST-NOT-LEAK-5e21"
+    content = "\n".join(
+        [
+            "\ufeffNotes:",
+            f'"{preamble_sentinel}, including comma-separated notice text"',
+            "",
+            _HEADERS,
+            "Alice,Example,url,alice@example.com,Acme,Engineer,04 Mar 2026,note",
+            "Bad,Date,url,bad@example.com,Acme,Engineer,not-a-date,note",
+        ]
+    )
+
+    extracted = LinkedInImportExtractor().extract(
+        "linkedin", content=content, path=None, self_addresses=set()
+    )
+
+    assert [candidate["name"] for candidate in extracted.candidates if candidate["type"] == "person"] == [
+        "Alice Example"
+    ]
+    assert extracted.skipped_cards == [{"index": 2, "reason": "invalid_connected_on"}]
+    assert preamble_sentinel not in repr(extracted)
+
+
 def test_linkedin_coalesces_email_names_but_keeps_no_email_rows_distinct_and_dedupes_dependents() -> None:
     content = _csv(
         "Alice,Example,url,alice@example.com,Acme,Engineer,04 Mar 2026,note",
