@@ -106,7 +106,7 @@ Check the matching box only in the PR that delivers it.
 
 ## M10 — Agent utilization
 
-- [ ] **M10.1 — Package usage and end-of-session capture skill**
+- [x] **M10.1 — Package usage and end-of-session capture skill**
   - **Scope:** Add root usage skill covering resolution first, context vs guidance, strict candidates, elevation
     gates, and review-only capture proposal.
   - **Acceptance:** never commits extracted batches automatically; validation/scripted transcript pass.
