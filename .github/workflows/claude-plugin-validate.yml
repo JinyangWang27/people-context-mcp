@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".claude-plugin/**"
+      - "skills/**"
       - "docs/claude-code-plugin.md"
       - ".github/workflows/claude-plugin-validate.yml"
       - ".github/tooling/claude-code/**"
@@ -17,6 +18,7 @@ on:
       - main
     paths:
       - ".claude-plugin/**"
+      - "skills/**"
       - "docs/claude-code-plugin.md"
       - ".github/workflows/claude-plugin-validate.yml"
       - ".github/tooling/claude-code/**"

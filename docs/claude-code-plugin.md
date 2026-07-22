@@ -53,6 +53,26 @@ launches Claude Code.
 
 The MCP server uses stdio. It does not listen on a TCP port and is available only to the local Claude Code process that launched it.
 
+## Bundled usage skill
+
+The plugin ships one root-level skill at `skills/people-context-usage/SKILL.md`. Claude
+Code discovers skills at the plugin root, not inside `.claude-plugin/`. The skill adds no
+new tool or capability; it teaches agents to compose the existing tools correctly:
+
+- resolve identity with `resolve_person` first and preserve the `ambiguous` candidate-list
+  contract instead of guessing;
+- read `get_person_context` for what is known and `get_communication_guidance` for how to
+  communicate;
+- capture extracted knowledge only through the strict `person`/`interaction`/`affiliation`/
+  `fact` staged-candidate vocabulary, never as raw conversation text;
+- treat `stage_candidates` as a proposal, `review_import` as inspection, and `commit_import`
+  as an explicit, user-approved later write — never an automatic commit;
+- treat the absence of `get_sensitive_person_context` and `export_data` from ordinary
+  discovery as an intended privacy gate, not something to work around.
+
+The skill is behavioural guidance only. It never enables elevated tools, never commits a
+staged batch automatically, and never copies raw transcript text into candidates.
+
 ## Security model
 
 Installing this plugin executes the repository's Python code locally through `uv` with the permissions of your operating-system user. It is not a sandboxed, data-only extension. Install only revisions you trust.
