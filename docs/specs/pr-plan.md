@@ -96,7 +96,7 @@ Check the matching box only in the PR that delivers it.
     stable unique batch refs.
   - **Out:** onboarding commands.
 
-- [ ] **M9.4 — Safe `init` and packaged `demo`**
+- [x] **M9.4 — Safe `init` and packaged `demo`**
   - **Scope:** Compose existing use cases for onboarding; add deterministic dedicated demo database.
   - **Acceptance:** seed self first with handle aliases; own card/dependants excluded; on a fresh store a no-handle
     same-name card targets self. Non-empty/ambiguous state refuses before mutation unless one self target is
