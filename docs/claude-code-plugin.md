@@ -86,13 +86,14 @@ write path — and model invocation is disabled so they run only when the user a
   candidate is returned, it surfaces the candidate list without guessing and performs
   no second read.
 - `/people-context:remember <description>` records durable knowledge down one of
-  these existing paths: an explicit person assertion uses `remember_person`, while
-  facts, affiliations, and interactions resolve their referenced people first (to
-  avoid staging duplicates) and are staged with `stage_candidates`, left pending
-  `review_import`. Requests that fit neither path — notably relationships, which have
-  no staging candidate type — are reported as unsupported rather than forced into the
-  schema. It never calls `commit_import` and never copies raw text into candidate
-  fields.
+  these existing paths, resolving every referenced person first (so an existing
+  contact is updated, not duplicated): an explicit person assertion uses
+  `remember_person` with the resolved canonical name, while facts, affiliations, and
+  interactions are staged with `stage_candidates` under a fixed non-content `source`
+  label and left pending `review_import`. It acts on prior conversation only when the
+  invocation explicitly asks for it, reports requests that fit neither path — notably
+  relationships, which have no staging candidate type — as unsupported, never calls
+  `commit_import`, and never copies raw text into candidate fields or the `source`.
 - `/people-context:reminders [person]` lists active reminders; when a person is named
   it resolves the identity first and filters by the resolved id, surfacing ambiguity
   rather than silently dropping the filter.

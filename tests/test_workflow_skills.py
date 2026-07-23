@@ -147,12 +147,36 @@ class TestRememberWorkflow:
         # Concise structured candidates only — never raw conversation/transcript text.
         assert "raw" in lowered and "transcript" in lowered
 
-    def test_no_automatic_extraction_heuristics(self) -> None:
+    def test_explicit_prior_context_capture_allowed_but_not_automatic(self) -> None:
         lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
 
-        # Out of scope: scanning prior context or applying automatic classification.
-        assert "do not scan prior conversation" in lowered
+        # The spec routes explicitly-requested prior-context capture through this
+        # workflow; only *automatic*/unprompted extraction is out of scope.
+        assert "explicitly" in lowered
+        assert "earlier conversation" in lowered or "prior context" in lowered
         assert "automatic" in lowered
+        assert "do not trawl" in lowered or "unrelated" in lowered
+
+    def test_resolves_direct_assertion_before_writing(self) -> None:
+        # Regression: remember_person's lookup matches only the exact normalized name
+        # (not aliases), so a partial-name assertion must resolve to the canonical
+        # identity first or it creates a duplicate person.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "resolve the person first" in lowered
+        assert "canonical name" in lowered
+        assert "not the supplied aliases" in lowered or "exact normalized `name`" in lowered
+
+    def test_uses_fixed_non_content_source_label(self) -> None:
+        # Regression: stage_candidates persists `source` as durable provenance, so the
+        # workflow must pass a fixed non-content label and never the raw description.
+        body = _skill_path("remember").read_text(encoding="utf-8")
+        lowered = body.lower()
+
+        assert "claude-code-remember" in lowered
+        assert "$ARGUMENTS" in body
+        assert "provenance" in lowered
+        assert "never" in lowered and "source" in lowered
 
     def test_resolves_referenced_people_before_staging(self) -> None:
         # Regression: the stager matches only exact normalized names/handles, so a
