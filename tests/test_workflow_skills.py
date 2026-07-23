@@ -282,6 +282,19 @@ class TestRememberWorkflow:
         assert "no dependent" in lowered
         assert "unsupported" in lowered
 
+    def test_combined_shared_name_identity_update_is_not_silently_discarded(self) -> None:
+        # Regression: dependent-only commits use the unaccepted person row only for
+        # matched_person_id, so any new alias or summary on that row is not applied.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "combined identity-and-structured request" in lowered
+        assert "record the structured portion only" in lowered
+        assert "do not discard identity updates in a dependent-only commit" in lowered
+        assert "must already belong to the matched person" in lowered
+        assert "identity fields are not recorded" in lowered
+        assert "identity portion is unsupported and was not recorded" in lowered
+        assert "do not present the whole proposal as committable" in lowered
+
     def test_prior_context_derived_content_always_stages(self) -> None:
         # Regression: the M10 contract keeps prior-context-derived content behind the
         # review gate, so even an extracted identity detail must stage, not direct-write.

@@ -41,7 +41,9 @@ staged schema can represent, route that structured content through **path 2 (sta
 so it is reviewable and queryable. Never fold it into a `remember_person` `summary`,
 which would bypass review and leave affiliation/fact queries unaware of the record. The
 path-1 summary fast path applies only to a pure identity assertion with no such
-structured content.
+structured content. For a combined identity-and-structured request targeting one of
+several identically-named people, do not imply that staging can apply both portions:
+the dependent-only path below can record the structured portion only.
 
 ### 1. Explicit person assertion → `remember_person`
 
@@ -174,6 +176,15 @@ pipeline resolves the reference to the existing person from `matched_person_id` 
 creating a person or re-minting the matched row, so the dependent commits cleanly. Only
 when no alias resolves uniquely is staging a dependent for one of several
 identically-named people unsupported — report that instead.
+
+**Do not discard identity updates in a dependent-only commit.** The verified alias or
+handle used above for binding must already belong to the matched person; it identifies
+the record but does not update it. When the same request also asks to add a new alias,
+name, summary, or other identity detail, leaving the person row unaccepted means that
+`_existing_resolution` uses only its `matched_person_id`; the identity fields are not recorded.
+Stage the supported dependent, but explicitly report that the identity portion is unsupported and was not recorded.
+Do not present the whole proposal as committable, and do not put new identity data on
+the unaccepted person row as if it will be applied.
 
 That dependent-only path needs a dependent record. A **person-only** staged update to a
 shared-canonical-name person — for instance a pure prior-context identity detail like a
