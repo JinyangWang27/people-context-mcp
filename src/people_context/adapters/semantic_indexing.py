@@ -15,11 +15,13 @@ from people_context.domain.person import Person
 from people_context.domain.relationship import Relationship
 from people_context.domain.reminder import Reminder, ReminderStatus
 from people_context.domain.trait import Trait
+from people_context.ports.audit_log import AuditLog
 from people_context.ports.forget import ForgetPreviewStore, ForgetStore
 from people_context.ports.lifecycle import ForgetStoreResult, MergeStoreResult
 from people_context.ports.merge import MergeStore
 from people_context.ports.records import Record, RecordReader, RecordWriter
 from people_context.ports.repository import PersonReader, PersonSearchIndexer, PersonWriter, SearchHit
+from people_context.ports.unit_of_work import UnitOfWork
 
 _WARNING_SUFFIX = "Primary data was saved; run `uv run people-context reindex --semantic` to repair vectors."
 
@@ -162,12 +164,12 @@ class IndexingMergeStore:
         return result
 
     @property
-    def unit_of_work(self):
+    def unit_of_work(self) -> UnitOfWork | None:
         """Forward an adapter-provided transaction boundary when present."""
         return getattr(self._delegate, "unit_of_work", None)
 
     @property
-    def audit_log(self):
+    def audit_log(self) -> AuditLog:
         """Forward the merge adapter's paired mutation journal."""
         return self._delegate.audit_log
 
@@ -209,12 +211,12 @@ class IndexingForgetStore:
         return self._delegate.preview_person_forget(person_id)
 
     @property
-    def unit_of_work(self):
+    def unit_of_work(self) -> UnitOfWork | None:
         """Forward an adapter-provided transaction boundary when present."""
         return getattr(self._delegate, "unit_of_work", None)
 
     @property
-    def audit_log(self):
+    def audit_log(self) -> AuditLog:
         """Forward the forget adapter's paired mutation journal."""
         return self._delegate.audit_log
 

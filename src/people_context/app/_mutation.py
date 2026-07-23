@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from functools import wraps
-from typing import Any, ParamSpec, TypeVar, cast
+from typing import Any, ParamSpec, Protocol, TypeVar, cast
 
 from pydantic import BaseModel
 
@@ -20,14 +20,19 @@ _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
 
+class _TransactionalUseCase(Protocol):
+    """Internal structural type required by the transactional decorator."""
+
+    _uow: UnitOfWork
+
+
 def transactional(method: Callable[_P, _R]) -> Callable[_P, _R]:
     """Run a write-use-case method inside its configured unit of work."""
 
     @wraps(method)
     def wrapped(*args: _P.args, **kwargs: _P.kwargs) -> _R:
-        instance = args[0]
-        uow = cast(UnitOfWork, instance._uow)
-        with uow:
+        instance = cast(_TransactionalUseCase, args[0])
+        with instance._uow:
             return method(*args, **kwargs)
 
     return wrapped

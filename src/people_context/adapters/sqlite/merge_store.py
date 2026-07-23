@@ -5,12 +5,14 @@ from __future__ import annotations
 import sqlite3
 from collections.abc import Callable
 from datetime import date
+from typing import cast
 
 from people_context.adapters.sqlite.audit_log import SqliteAuditLog
 from people_context.adapters.sqlite.record_store import SqliteRecordStore
 from people_context.adapters.sqlite.repository import SqlitePeopleRepository
 from people_context.adapters.sqlite.unit_of_work import SqliteUnitOfWork
 from people_context.domain.person import Person
+from people_context.domain.relationship import Relationship
 from people_context.domain.shared import ValidityPeriod, normalize_name
 from people_context.ports.lifecycle import (
     LifecycleChange,
@@ -207,17 +209,18 @@ class SqliteMergeStore:
                     )
                 )
                 continue
+            relationship = cast(Relationship, record)
             changed_fields = []
-            if record.subject_id != row["subject_id"]:
+            if relationship.subject_id != row["subject_id"]:
                 changed_fields.append("subject_id")
-            if record.object_id != row["object_id"]:
+            if relationship.object_id != row["object_id"]:
                 changed_fields.append("object_id")
             changes.append(
                 LifecycleChange(
                     entity_type="relationship",
                     entity_id=row["id"],
                     op_kind="update",
-                    payload=record.model_dump(mode="json"),
+                    payload=relationship.model_dump(mode="json"),
                     changed_fields=changed_fields,
                 )
             )
@@ -396,4 +399,3 @@ class SqliteMergeStore:
     def _checkpoint(self, name: str) -> None:
         if self._failure_hook is not None:
             self._failure_hook(name)
-
