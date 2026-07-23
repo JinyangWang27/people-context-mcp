@@ -18,14 +18,16 @@ Optional person filter: **$ARGUMENTS**
    `person_id`. It returns active reminders, due-dated first and communication notes
    last.
 
-2. **A person is named:** resolve the identity before filtering.
+2. **A person is named:** resolve the identity before filtering. Call `resolve_person`
+   with the given text and branch on its own `ambiguous` flag — not on candidate count.
+   The resolver may return several ranked candidates yet report `ambiguous: false`
+   when the top match is confidently ahead.
 
-   - Call `resolve_person` with the given text.
-   - **Exactly one confident match** (single candidate, not flagged `ambiguous`):
-     call `list_reminders` with that candidate's `person_id`.
-   - **`ambiguous` or multiple candidates:** stop and surface the candidate list so
-     the user can choose. Do **not** silently drop the person filter and list
-     everyone's reminders, and do not guess a candidate.
+   - **`ambiguous: false` with at least one candidate:** call `list_reminders` with
+     the ranked top candidate's (`candidates[0]`) `person_id`.
+   - **`ambiguous: true`:** stop and surface the candidate list so the user can
+     choose. Do **not** silently drop the person filter and list everyone's
+     reminders, and do not guess a candidate.
    - **Empty candidate list:** report that no one matching is stored rather than
      falling back to an unfiltered list; let the user restate who they mean.
 

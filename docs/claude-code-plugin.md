@@ -80,15 +80,19 @@ invocable as a slash command in the `people-context` namespace. They are thin
 compositions of the existing tools — they add no new tool, port, response field, or
 write path — and model invocation is disabled so they run only when the user asks:
 
-- `/people-context:who <query>` calls `resolve_person`; on exactly one confident,
-  non-`ambiguous` match it then calls `get_person_context`. On ambiguity, multiple
-  candidates, or no match it surfaces the candidate list without guessing and performs
+- `/people-context:who <query>` calls `resolve_person` and branches on its
+  `ambiguous` flag (not candidate count): when `ambiguous` is false it reads the
+  ranked top candidate with `get_person_context`; when `ambiguous` is true, or no
+  candidate is returned, it surfaces the candidate list without guessing and performs
   no second read.
-- `/people-context:remember <description>` records durable knowledge down one of two
-  existing paths: an explicit person assertion uses `remember_person`, while facts,
-  affiliations, interactions, or anything extracted from context are staged with
-  `stage_candidates` and left pending `review_import`. It never calls `commit_import`
-  and never copies raw text into candidate fields.
+- `/people-context:remember <description>` records durable knowledge down one of
+  these existing paths: an explicit person assertion uses `remember_person`, while
+  facts, affiliations, and interactions resolve their referenced people first (to
+  avoid staging duplicates) and are staged with `stage_candidates`, left pending
+  `review_import`. Requests that fit neither path — notably relationships, which have
+  no staging candidate type — are reported as unsupported rather than forced into the
+  schema. It never calls `commit_import` and never copies raw text into candidate
+  fields.
 - `/people-context:reminders [person]` lists active reminders; when a person is named
   it resolves the identity first and filters by the resolved id, surfacing ambiguity
   rather than silently dropping the filter.

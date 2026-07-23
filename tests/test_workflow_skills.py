@@ -104,12 +104,16 @@ class TestWhoWorkflow:
         # Resolution must be introduced before the context read.
         assert body.index("resolve_person") < body.index("get_person_context")
 
-    def test_reads_context_only_on_single_unambiguous_match(self) -> None:
+    def test_gates_on_ambiguous_flag_not_candidate_count(self) -> None:
+        # Regression for the resolver contract: `ambiguous: false` can accompany
+        # multiple ranked candidates, so a confident resolution must be read via the
+        # `ambiguous` flag and the ranked top candidate, never by candidate count.
         lowered = _skill_path("who").read_text(encoding="utf-8").lower()
 
         assert "ambiguous" in lowered
-        # A second read (get_person_context) happens only for exactly one confident match.
-        assert "exactly one" in lowered or "single" in lowered
+        assert "not on candidate count" in lowered
+        assert "`ambiguous: false`" in lowered
+        assert "candidates[0]" in lowered
         assert "never silently pick" in lowered or "do not guess" in lowered or "never guess" in lowered
 
     def test_ambiguous_and_empty_perform_no_second_read(self) -> None:
@@ -150,6 +154,30 @@ class TestRememberWorkflow:
         assert "do not scan prior conversation" in lowered
         assert "automatic" in lowered
 
+    def test_resolves_referenced_people_before_staging(self) -> None:
+        # Regression: the stager matches only exact normalized names/handles, so a
+        # partial reference must be resolved to its canonical identity before staging
+        # or it is committed as a duplicate person.
+        body = _skill_path("remember").read_text(encoding="utf-8")
+        lowered = body.lower()
+
+        assert "resolve_person" in body
+        assert "resolve every referenced person" in lowered
+        assert "duplicate" in lowered
+        # Resolution is introduced before the staging call.
+        assert body.index("resolve_person") < body.index("stage_candidates")
+
+    def test_reports_relationship_limitation_instead_of_mis_staging(self) -> None:
+        # Regression: staging has no relationship candidate type, so a relationship
+        # must be reported as unsupported, never forced into the staging schema.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "relationship" in lowered
+        assert "fits neither" in lowered
+        assert "not captured here" in lowered
+        # It must not add a relationship write path (out of scope for this workflow).
+        assert "set_relationship" not in lowered
+
 
 class TestRemindersWorkflow:
     """``/people-context:reminders`` — resolve optional person, surface ambiguity."""
@@ -173,3 +201,11 @@ class TestRemindersWorkflow:
 
         assert "ambiguous" in lowered
         assert "silently drop" in lowered or "never silently" in lowered
+
+    def test_gates_on_ambiguous_flag_not_candidate_count(self) -> None:
+        # Regression mirroring /who: filter by the resolved top candidate on
+        # `ambiguous: false`, never gate on candidate count.
+        lowered = _skill_path("reminders").read_text(encoding="utf-8").lower()
+
+        assert "not on candidate count" in lowered
+        assert "candidates[0]" in lowered
