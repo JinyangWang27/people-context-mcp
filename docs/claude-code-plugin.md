@@ -73,6 +73,29 @@ new tool or capability; it teaches agents to compose the existing tools correctl
 The skill is behavioural guidance only. It never enables elevated tools, never commits a
 staged batch automatically, and never copies raw transcript text into candidates.
 
+## User-invocable workflows
+
+The plugin also ships three user-invoked workflow skills under `skills/`, each
+invocable as a slash command in the `people-context` namespace. They are thin
+compositions of the existing tools — they add no new tool, port, response field, or
+write path — and model invocation is disabled so they run only when the user asks:
+
+- `/people-context:who <query>` calls `resolve_person`; on exactly one confident,
+  non-`ambiguous` match it then calls `get_person_context`. On ambiguity, multiple
+  candidates, or no match it surfaces the candidate list without guessing and performs
+  no second read.
+- `/people-context:remember <description>` records durable knowledge down one of two
+  existing paths: an explicit person assertion uses `remember_person`, while facts,
+  affiliations, interactions, or anything extracted from context are staged with
+  `stage_candidates` and left pending `review_import`. It never calls `commit_import`
+  and never copies raw text into candidate fields.
+- `/people-context:reminders [person]` lists active reminders; when a person is named
+  it resolves the identity first and filters by the resolved id, surfacing ambiguity
+  rather than silently dropping the filter.
+
+None of the workflows call or suggest enabling the gated
+`get_sensitive_person_context` or `export_data` tools.
+
 ## Security model
 
 Installing this plugin executes the repository's Python code locally through `uv` with the permissions of your operating-system user. It is not a sandboxed, data-only extension. Install only revisions you trust.
