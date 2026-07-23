@@ -11,8 +11,8 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
-      - "tests/adapters/test_mcp_server.py"
-      - "tests/adapters/test_email_import.py"
+      - "tests/adapters/mcp/test_server.py"
+      - "tests/adapters/importers/test_email.py"
   push:
     branches:
       - main
@@ -25,8 +25,8 @@ on:
       - "pyproject.toml"
       - "uv.lock"
       - "src/**"
-      - "tests/adapters/test_mcp_server.py"
-      - "tests/adapters/test_email_import.py"
+      - "tests/adapters/mcp/test_server.py"
+      - "tests/adapters/importers/test_email.py"
 
 permissions: read-all
 
@@ -62,5 +62,5 @@ jobs:
       - name: Verify security boundaries
         run: >-
           uv run --locked pytest -q
-          tests/adapters/test_mcp_server.py
-          tests/adapters/test_email_import.py
+          tests/adapters/mcp/test_server.py
+          tests/adapters/importers/test_email.py

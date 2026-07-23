@@ -12,7 +12,7 @@ on:
       - "uv.lock"
       - "src/**"
       - "tests/test_codex_plugin.py"
-      - "tests/adapters/test_mcp_server.py"
+      - "tests/adapters/mcp/test_server.py"
   push:
     branches:
       - main
@@ -26,7 +26,7 @@ on:
       - "uv.lock"
       - "src/**"
       - "tests/test_codex_plugin.py"
-      - "tests/adapters/test_mcp_server.py"
+      - "tests/adapters/mcp/test_server.py"
 
 permissions: read-all
 
@@ -44,7 +44,7 @@ jobs:
         uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990 # v8.3.2
 
       - name: Validate plugin contracts
-        run: uv run --locked pytest -q tests/test_codex_plugin.py tests/adapters/test_mcp_server.py
+        run: uv run --locked pytest -q tests/test_codex_plugin.py tests/adapters/mcp/test_server.py
 
       - name: Verify local MCP entry point
         run: uv run --locked people-context-mcp --help

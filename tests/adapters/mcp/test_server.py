@@ -7,9 +7,9 @@ from typing import Any
 
 import anyio
 import pytest
-
 from mcp.client.session import ClientSession
 from mcp.shared.memory import create_connected_server_and_client_session
+
 from people_context.adapters import runtime as runtime_module
 from people_context.adapters.mcp.server import build_server
 from people_context.adapters.model2vec_embeddings import MODEL_ID
