@@ -79,7 +79,7 @@ From the repository root:
 
 ```bash
 uv run ruff check .
-uv run pytest -q tests/test_codex_plugin.py tests/adapters/test_mcp_server.py
+uv run pytest -q tests/test_codex_plugin.py tests/adapters/mcp/test_server.py
 uv run --locked people-context-mcp --help
 ```
 

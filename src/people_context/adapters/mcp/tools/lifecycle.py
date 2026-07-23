@@ -6,17 +6,18 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import ToolAnnotations
 
-from people_context.app import ForgetError, MergePeopleError, PersonNotFoundError, RecordNotFoundError
+from people_context.app.people import ForgetError, MergePeopleError
+from people_context.app.records import PersonNotFoundError, RecordNotFoundError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from people_context.adapters.mcp.server import ToolDeps
+    from people_context.adapters.runtime import RuntimeUseCases
 
 _DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True)
 
 
-def register(mcp: FastMCP, deps: ToolDeps) -> None:
+def register(mcp: FastMCP, deps: RuntimeUseCases) -> None:
     """Register implemented lifecycle tools."""
 
     @mcp.tool(annotations=_DESTRUCTIVE)

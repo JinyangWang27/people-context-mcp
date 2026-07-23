@@ -129,10 +129,9 @@ reach the real tables:
 
 ## Importers are adapters
 
-Import parsing lives in `adapters/email_import.py`, `adapters/vcard_import.py`, `adapters/ics_import.py`, and
-`adapters/linkedin_import.py`,
-dispatched by `adapters/import_router.py`, which produce candidates consumed by the shared app-layer import use
-cases. This means:
+Import parsing lives in the source-specific modules under `adapters/importers/` and is dispatched by
+`adapters/importers/router.py`. Those adapters produce candidates consumed by the models, staging, and workflow
+modules under `app/imports/`. This means:
 
 - The staging/review/commit flow, the `import_staging` schema, and the provenance rules are shared across
   every source type, including agent-side extraction.

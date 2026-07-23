@@ -5,11 +5,13 @@
 Application code lives under `src/people_context/` and follows a hexagonal architecture:
 
 - `domain/` contains Pydantic entities and dependency-free business rules.
-- `app/` contains one use case per module and depends only on `domain/` and narrow protocols in `ports/`.
+- `app/` groups focused use cases by capability and depends only on `domain/` and narrow protocols in `ports/`.
 - `adapters/` contains SQLite persistence, MCP transports/tools, importers, and optional semantic integrations.
-- `cli.py`, `config.py`, and `adapters/mcp/server.py` are composition and process-boundary entry points.
+- `adapters/runtime.py` is the shared composition root; `cli/`, `config.py`, and `adapters/mcp/server.py` are
+  process-boundary entry points.
 
-Tests mirror these layers under `tests/domain/`, `tests/app/`, and `tests/adapters/`. Design documentation, interface contracts, privacy rules, and ADRs live in `docs/`.
+Tests mirror these layers and capabilities under `tests/domain/`, `tests/app/`, `tests/adapters/`, and
+`tests/cli/`. Design documentation, interface contracts, privacy rules, and ADRs live in `docs/`.
 
 ## Build, Test, and Development Commands
 

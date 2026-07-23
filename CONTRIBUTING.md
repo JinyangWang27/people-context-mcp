@@ -22,7 +22,8 @@ ports-and-adapters architecture:
 - `domain/` contains dependency-free entities and business rules;
 - `app/` contains use cases and depends only on `domain/` and narrow `ports/` protocols;
 - `adapters/` implements persistence, MCP, import, export, and optional semantic integrations; and
-- composition belongs at process boundaries such as `cli.py` and `adapters/mcp/server.py`.
+- composition belongs in `adapters/runtime.py`, shared by process boundaries such as `cli/` and
+  `adapters/mcp/server.py`.
 
 Never import adapters, MCP, or SQLite from `domain/` or `app/`. Preserve the documented disclosure gates, local
 storage boundary, loopback-only HTTP policy, and rule that ordinary commands do not access the network.

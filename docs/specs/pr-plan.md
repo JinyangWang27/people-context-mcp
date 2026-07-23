@@ -76,7 +76,7 @@ Check the matching box only in the PR that delivers it.
 ## M9 — Cold start & onboarding
 
 - [x] **M9.1 — Relocate import router without dropping `mbox`**
-  - **Scope:** Move explicit dispatch to `adapters/import_router.py`.
+  - **Scope:** Move explicit dispatch to `adapters/importers/router.py`.
   - **Acceptance:** `email`/`mbox` → email, `vcard` → vCard, unknown → `invalid_source_type`; preserve `mbox`
     path-only semantics and E2E behavior.
   - **Out:** ICS and LinkedIn implementations.

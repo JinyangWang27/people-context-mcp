@@ -114,8 +114,7 @@ extract-and-stage import pipeline to the contact sources people actually export 
   `resolve_person`, `get_relationship_graph`, and `find_connection` examples;
 - two new import sources reusing the existing candidate vocabulary with zero schema/review-gate changes: `.ics`
   calendar attendees (`source_type="ics"`) and LinkedIn connections (`source_type="linkedin"`);
-- `ImportExtractorRouter` moves from `adapters/vcard_import.py` to its own adapter module without dropping the
-  existing `mbox` source;
+- `ImportExtractorRouter` lives in `adapters/importers/router.py` without dropping the existing `mbox` source;
 - fake-port, real-SQLite, in-memory MCP, CLI, packaging, and stdio E2E coverage.
 
 **Status:** Delivered.
