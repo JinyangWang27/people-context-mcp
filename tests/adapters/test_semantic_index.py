@@ -15,7 +15,7 @@ from people_context.adapters.sqlite.semantic import (
     SqliteVectorIndex,
     create_sqlite_vector_index,
 )
-from people_context.app.semantic_indexing import SemanticIndexUpdater
+from people_context.app.semantic.indexing import SemanticIndexUpdater
 from people_context.domain.person import Alias, Person
 from people_context.ports.semantic import SemanticDocument, SemanticIndexMetadata, VectorSearchHit
 

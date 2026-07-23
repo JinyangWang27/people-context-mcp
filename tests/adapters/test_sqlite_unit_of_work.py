@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import pytest
 
 from people_context.adapters.sqlite import SqliteAuditLog, SqlitePeopleRepository, SqliteUnitOfWork, open_db
-from people_context.app import RememberPerson, RememberPersonInput
+from people_context.app.people import RememberPerson, RememberPersonInput
 from people_context.ports.clock import Clock
 
 

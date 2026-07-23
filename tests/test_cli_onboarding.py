@@ -10,7 +10,8 @@ import pytest
 
 from people_context import cli
 from people_context.adapters.sqlite import SqliteAuditLog, SqliteGraphReader, SqlitePeopleRepository, open_db
-from people_context.app import AliasInput, ImportReviewRow, RememberPerson, RememberPersonInput
+from people_context.app.imports import ImportReviewRow
+from people_context.app.people import AliasInput, RememberPerson, RememberPersonInput
 from people_context.domain.person import AliasKind, Person
 from people_context.domain.preferences import PREF_COMMUNICATION_PHILOSOPHY
 from people_context.ports.clock import SystemClock

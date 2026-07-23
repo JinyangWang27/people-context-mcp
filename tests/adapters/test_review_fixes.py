@@ -21,15 +21,16 @@ from people_context.adapters.sqlite import (
     SqliteRecordStore,
     open_db,
 )
-from people_context.app.edit_person import EditPerson, EditPersonInput, PersonNameCollisionError
-from people_context.app.forget import Forget
-from people_context.app.import_content import CandidateStager, CommitImport
-from people_context.app.merge_people import MergePeople
-from people_context.app.record import AmbiguousPersonError, RememberPerson, RememberPersonInput
-from people_context.app.record_fact import RecordFact
-from people_context.app.record_interaction import RecordInteraction
-from people_context.app.set_affiliation import SetAffiliation
-from people_context.app.write_support import changelog_mutation
+from people_context.app._mutation import changelog_mutation
+from people_context.app.imports.staging import CandidateStager
+from people_context.app.imports.workflow import CommitImport
+from people_context.app.people.edit import EditPerson, EditPersonInput, PersonNameCollisionError
+from people_context.app.people.forget import Forget
+from people_context.app.people.merge import MergePeople
+from people_context.app.people.remember import AmbiguousPersonError, RememberPerson, RememberPersonInput
+from people_context.app.records.affiliations import SetAffiliation
+from people_context.app.records.facts import RecordFact
+from people_context.app.records.interactions import RecordInteraction
 from people_context.cli import main
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.ports.audit_log import AuditEntry

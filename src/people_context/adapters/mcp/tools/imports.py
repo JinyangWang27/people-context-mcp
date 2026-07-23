@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import ToolAnnotations
 
 from people_context.adapters.email_import import ImportExtractionError
-from people_context.app import ImportPipelineError
+from people_context.app.imports import ImportPipelineError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP

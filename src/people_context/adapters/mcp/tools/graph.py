@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import ToolAnnotations
 
-from people_context.app.relationship_graph import GraphTraversalError
+from people_context.app.relationships.graph import GraphTraversalError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP

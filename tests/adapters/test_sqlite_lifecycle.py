@@ -14,7 +14,7 @@ from people_context.adapters.sqlite import (
     SqliteRecordStore,
     open_db,
 )
-from people_context.app import Forget, MergePeople, MergePeopleError
+from people_context.app.people import Forget, MergePeople, MergePeopleError
 from people_context.domain.fact import Fact
 from people_context.domain.interaction import Interaction
 from people_context.domain.person import Alias, AliasKind, Person

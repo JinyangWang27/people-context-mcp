@@ -13,14 +13,14 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import ToolAnnotations
 
 from people_context.adapters.mcp.security import process_elevation_enabled
-from people_context.app import (
+from people_context.app.people import (
     AliasInput,
     AmbiguousPersonError,
     RememberPersonInput,
     ResolutionHints,
     SelfAlreadyExistsError,
-    SemanticSearchValidationError,
 )
+from people_context.app.semantic import SemanticSearchValidationError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP

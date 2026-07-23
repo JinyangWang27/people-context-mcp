@@ -49,36 +49,29 @@ from people_context.adapters.sqlite import (
     open_db,
     open_sqlite_vector_index,
 )
-from people_context.app import (
-    AddAlias,
+from people_context.app.context import GetCommunicationGuidance, GetPersonContext, SetCommunicationPhilosophy
+from people_context.app.exports import ExportData
+from people_context.app.imports import (
     CandidateStager,
     CommitImport,
+    ImportContent,
+    ReviewImport,
+    StageCandidates,
+)
+from people_context.app.people import AddAlias, Forget, MergePeople, RememberPerson, ResolvePerson, SearchPeople
+from people_context.app.records import (
     CompleteReminder,
     CorrectRecord,
-    ExportData,
-    FindConnection,
-    Forget,
-    GetCommunicationGuidance,
-    GetPersonContext,
-    GetRelationshipGraph,
-    ImportContent,
     ListReminders,
-    MergePeople,
     RecordFact,
     RecordInteraction,
     RecordObservation,
     RecordTrait,
-    RememberPerson,
-    ResolvePerson,
-    ReviewImport,
-    SearchPeople,
-    SemanticSearch,
     SetAffiliation,
-    SetCommunicationPhilosophy,
-    SetRelationship,
     SetReminder,
-    StageCandidates,
 )
+from people_context.app.relationships import FindConnection, GetRelationshipGraph, SetRelationship
+from people_context.app.semantic import SemanticSearch
 from people_context.config import resolve_db_path
 from people_context.ports.clock import SystemClock
 

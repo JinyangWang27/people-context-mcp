@@ -16,7 +16,7 @@ from people_context.adapters.sqlite import (
     SqliteRelationshipVocabularyStore,
     open_db,
 )
-from people_context.app import NormalizeRelationships, SetRelationship, SetRelationshipInput
+from people_context.app.relationships import NormalizeRelationships, SetRelationship, SetRelationshipInput
 from people_context.domain.person import Person
 from people_context.ports.clock import SystemClock
 

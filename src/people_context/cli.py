@@ -44,46 +44,49 @@ from people_context.adapters.sqlite import (
     create_sqlite_vector_index,
     open_db,
 )
-from people_context.app import (
+from people_context.app.context import (
+    GetPersonContext,
+    PersonContextResult,
+    SetCommunicationPhilosophy,
+    SetCommunicationPhilosophyInput,
+)
+from people_context.app.exports import ExportData, ExportVault
+from people_context.app.imports import CommitImport, ImportContent, ImportPipelineError, ImportReviewRow, ReviewImport
+from people_context.app.people import (
     AddAlias,
     AddAliasInput,
-    AddRelationshipType,
-    AddRelationshipTypeInput,
     AliasInput,
     AmbiguousPersonError,
-    CommitImport,
     EditPerson,
     EditPersonInput,
-    ExportData,
-    ExportVault,
     Forget,
-    GetPersonContext,
-    ImportContent,
-    ImportPipelineError,
-    ImportReviewRow,
-    NormalizeRelationships,
-    PersonContextResult,
     PersonNameCollisionError,
     PreviewForget,
+    RememberPerson,
+    RememberPersonInput,
+    ResolvePerson,
+    SearchPeople,
+    SelfAlreadyExistsError,
+)
+from people_context.app.records import (
     RecordFact,
     RecordFactInput,
     RecordInteraction,
     RecordInteractionInput,
-    ReindexPeople,
-    ReindexSemantic,
-    RelationshipTypeAlreadyExistsError,
-    RememberPerson,
-    RememberPersonInput,
-    ResolvePerson,
-    ReviewImport,
-    SearchPeople,
-    SelfAlreadyExistsError,
     SetAffiliation,
     SetAffiliationInput,
-    SetCommunicationPhilosophy,
-    SetCommunicationPhilosophyInput,
+)
+from people_context.app.relationships import (
+    AddRelationshipType,
+    AddRelationshipTypeInput,
+    NormalizeRelationships,
+    RelationshipTypeAlreadyExistsError,
     SetRelationship,
     SetRelationshipInput,
+)
+from people_context.app.semantic import (
+    ReindexPeople,
+    ReindexSemantic,
 )
 from people_context.config import describe_resolution, resolve_db_path
 from people_context.demo_seed import (

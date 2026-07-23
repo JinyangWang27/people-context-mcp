@@ -6,7 +6,7 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from people_context.app.semantic_indexing import SemanticIndexUpdater
+from people_context.app.semantic.indexing import SemanticIndexUpdater
 from people_context.domain.fact import Fact
 from people_context.domain.interaction import Interaction
 from people_context.domain.observation import Observation

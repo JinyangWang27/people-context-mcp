@@ -8,8 +8,9 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ValidationError
 
-from people_context.app import (
-    AddAliasInput,
+from people_context.app.context import SetCommunicationPhilosophyInput
+from people_context.app.people import AddAliasInput
+from people_context.app.records import (
     CompleteReminderInput,
     CorrectRecordInput,
     InvalidCorrectionError,
@@ -24,10 +25,9 @@ from people_context.app import (
     RecordTraitInput,
     ReminderNotActiveError,
     SetAffiliationInput,
-    SetCommunicationPhilosophyInput,
-    SetRelationshipInput,
     SetReminderInput,
 )
+from people_context.app.relationships import SetRelationshipInput
 from people_context.domain.person import AliasKind
 from people_context.domain.reminder import ReminderStatus
 from people_context.domain.shared import Sensitivity

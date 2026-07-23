@@ -16,7 +16,8 @@ from people_context.adapters.sqlite import (
     SqliteVaultReader,
     open_db,
 )
-from people_context.app import ExportVault, SetRelationship, SetRelationshipInput
+from people_context.app.exports import ExportVault
+from people_context.app.relationships import SetRelationship, SetRelationshipInput
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.domain.vault import VaultPerson, VaultSnapshot
 from people_context.ports.clock import SystemClock

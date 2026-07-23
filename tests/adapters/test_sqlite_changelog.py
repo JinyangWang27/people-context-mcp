@@ -16,16 +16,21 @@ from people_context.adapters.sqlite import (
     SqliteRecordStore,
     open_db,
 )
-from people_context.app import (
+from people_context.app.context import SetCommunicationPhilosophy, SetCommunicationPhilosophyInput
+from people_context.app.people import (
     AddAlias,
     AddAliasInput,
+    EditPerson,
+    EditPersonInput,
+    MergePeople,
+    RememberPerson,
+    RememberPersonInput,
+)
+from people_context.app.records import (
     CompleteReminder,
     CompleteReminderInput,
     CorrectRecord,
     CorrectRecordInput,
-    EditPerson,
-    EditPersonInput,
-    MergePeople,
     RecordFact,
     RecordFactInput,
     RecordInteraction,
@@ -34,17 +39,12 @@ from people_context.app import (
     RecordObservationInput,
     RecordTrait,
     RecordTraitInput,
-    RememberPerson,
-    RememberPersonInput,
     SetAffiliation,
     SetAffiliationInput,
-    SetCommunicationPhilosophy,
-    SetCommunicationPhilosophyInput,
-    SetRelationship,
-    SetRelationshipInput,
     SetReminder,
     SetReminderInput,
 )
+from people_context.app.relationships import SetRelationship, SetRelationshipInput
 from people_context.domain.preferences import PREF_COMMUNICATION_PHILOSOPHY
 from people_context.domain.reminder import ReminderKind
 from people_context.domain.trait import TraitCategory
@@ -226,7 +226,7 @@ def test_merge_then_forget_redacts_all_person_content_and_retains_id_only_tombst
     )
     MergePeople(people, SqliteLifecycleStore(conn), clock, audit).execute(primary.id, duplicate.id)
 
-    from people_context.app import Forget
+    from people_context.app.people import Forget
 
     Forget(people, SqliteLifecycleStore(conn), clock, audit).execute(primary.id, "person")
 
@@ -245,7 +245,7 @@ def test_merge_then_forget_redacts_all_person_content_and_retains_id_only_tombst
     assert merge_rows and all(row["payload_json"] == '{"redacted": true}' for row in merge_rows)
 
     before_count = conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0]
-    from people_context.app.write_support import PersonNotFoundError
+    from people_context.app._mutation import PersonNotFoundError
 
     with pytest.raises(PersonNotFoundError):
         RecordFact(people, records, audit, clock).execute(
@@ -265,7 +265,7 @@ def test_record_then_person_forget_keeps_both_tombstones_and_no_record_content()
     fact = RecordFact(people, records, audit, clock).execute(
         RecordFactInput(person_id=person.id, predicate="secret", value=sentinel)
     )
-    from people_context.app import Forget
+    from people_context.app.people import Forget
 
     forget = Forget(people, SqliteLifecycleStore(conn), clock, audit)
     forget.execute(f"fact:{fact.id}", "record")
@@ -303,7 +303,7 @@ def test_forget_rolls_back_deletion_redaction_audit_hlc_and_tombstone_on_capture
     def fail(_: str) -> None:
         raise RuntimeError("forget changelog failure")
 
-    from people_context.app import Forget
+    from people_context.app.people import Forget
 
     lifecycle = SqliteLifecycleStore(conn, changelog_failure_hook=fail)
     with pytest.raises(RuntimeError, match="forget changelog failure"):

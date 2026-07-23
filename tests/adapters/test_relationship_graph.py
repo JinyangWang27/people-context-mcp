@@ -12,7 +12,7 @@ from people_context.adapters.sqlite import (
     SqliteRelationshipVocabularyStore,
     open_db,
 )
-from people_context.app import (
+from people_context.app.relationships import (
     FindConnection,
     GetRelationshipGraph,
     SetRelationship,

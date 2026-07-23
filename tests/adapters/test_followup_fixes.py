@@ -18,9 +18,9 @@ from people_context.adapters.sqlite import (
     SqliteRelationshipVocabularyStore,
     open_db,
 )
-from people_context.app.merge_people import MergePeople
-from people_context.app.record import RememberPerson, RememberPersonInput
-from people_context.app.set_relationship import SetRelationship, SetRelationshipInput
+from people_context.app.people.merge import MergePeople
+from people_context.app.people.remember import RememberPerson, RememberPersonInput
+from people_context.app.relationships.commands import SetRelationship, SetRelationshipInput
 from people_context.domain.organization import Organization
 from people_context.domain.person import Person
 

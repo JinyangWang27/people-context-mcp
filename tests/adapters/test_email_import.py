@@ -19,13 +19,15 @@ from people_context.adapters.sqlite import (
     SqliteRecordStore,
     open_db,
 )
-from people_context.app import (
+from people_context.app.imports import (
     CommitImport,
     ImportContent,
+    ReviewImport,
+)
+from people_context.app.people import RememberPerson
+from people_context.app.records import (
     RecordFact,
     RecordInteraction,
-    RememberPerson,
-    ReviewImport,
     SetAffiliation,
 )
 from people_context.domain.person import Alias, AliasKind, Person

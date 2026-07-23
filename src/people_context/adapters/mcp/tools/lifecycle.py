@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Any
 
 from mcp.types import ToolAnnotations
 
-from people_context.app import ForgetError, MergePeopleError, PersonNotFoundError, RecordNotFoundError
+from people_context.app.people import ForgetError, MergePeopleError
+from people_context.app.records import PersonNotFoundError, RecordNotFoundError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP

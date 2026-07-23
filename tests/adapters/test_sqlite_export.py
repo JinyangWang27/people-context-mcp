@@ -16,7 +16,7 @@ from people_context.adapters.sqlite import (
     SqliteRecordStore,
     open_db,
 )
-from people_context.app import ExportData
+from people_context.app.exports import ExportData
 from people_context.cli import CliContext, _cmd_export
 from people_context.domain.interaction import Interaction
 from people_context.domain.person import Alias, Person
