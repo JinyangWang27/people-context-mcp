@@ -23,6 +23,13 @@ targeted, user-requested capture is exactly what this workflow is for. What stay
 of scope is *automatic* extraction: do not trawl the conversation for unrelated things
 to persist, and do not apply classification heuristics beyond the explicit request.
 
+**Anything derived from prior context always stages.** The M10 contract requires
+information extracted from earlier conversation to remain pending review, so route
+**all** prior-context-derived content through path 2 (staging) — even a pure identity
+detail such as a newly mentioned nickname. The direct `remember_person` fast path in
+path 1 is only for an assertion stated **directly in this invocation**, never for
+content extracted from prior context.
+
 Whichever path applies below, **resolve every person the request names first** with
 `resolve_person` (see [Resolve people first](#resolve-people-first)) so an existing
 person is updated, not duplicated.
@@ -38,10 +45,11 @@ structured content.
 
 ### 1. Explicit person assertion → `remember_person`
 
-When the description is a pure identity assertion that a specific person exists or
-should be recorded — a name, optionally aliases/nicknames, a one-line summary of who
-they are, and optionally that they are the user (`is_self`) — and it carries no
-structured fact/affiliation/interaction, it fits `remember_person`'s contract.
+When the description is a pure identity assertion **stated directly in this invocation**
+(not extracted from prior context) that a specific person exists or should be recorded —
+a name, optionally aliases/nicknames, a one-line summary of who they are, and optionally
+that they are the user (`is_self`) — and it carries no structured
+fact/affiliation/interaction, it fits `remember_person`'s contract.
 Resolve the person first; if a confident match exists, call `remember_person` with their
 **canonical name** so the existing record is updated (its lookup matches only the exact
 normalized `name`, not the supplied aliases, so a partial name like `Alice` would
@@ -84,10 +92,17 @@ guess when it occurred.
 
 **First-person references are the user, not a new person.** "I", "me", and "my" denote
 the user's own self record. A staged `person` candidate has no `is_self` field, so
-staging "I" would create a duplicate person literally named `I`. Omit the self
-participant from interactions — self is implicit, matching the importers — and stage
-only the resolved other people. If the only participant would be the user, there is
-nothing to stage; report that.
+staging "I" would create a duplicate person literally named `I`. Handle self by role:
+
+- **Self as an interaction participant** ("I met Alice"): omit the self participant —
+  self is implicit, matching the importers — and stage only the resolved other people.
+  If the only participant would be the user, there is nothing to stage; report that.
+- **Self as a fact or affiliation subject** ("I live in London", "I am an engineer at
+  Acme"): these need a `person_ref`, so self must be a person candidate that binds to
+  the existing self record. Stage that candidate using the self record's **resolvable
+  canonical name or handle** (never a bare "I"), so the stager matches the existing
+  self. If the self identity cannot be resolved or named that way, report the case as
+  unsupported rather than staging a duplicate `I`.
 
 ### Resolve people first
 
@@ -100,14 +115,19 @@ duplicate** of the stored `Alice Smith`. If resolution is `ambiguous`, surface t
 candidates and let the user choose before writing; do not guess. If resolution is
 empty, the person is genuinely new — create or stage them as new.
 
-A staged `person` candidate has **no `person_id` field**, and staging a person who
-shares a normalized canonical name with another stored person **cannot be committed at
-all** — a unique handle does not rescue it. On commit the pipeline re-derives the person
-by `canonical_name` and calls `remember_person`, which raises `ambiguous_person` for the
-duplicate name even when a handle bound the staged row. So when the resolved person
-shares a normalized canonical name with another, do **not** stage a candidate for them;
-report that this workflow cannot record staged facts/affiliations/interactions for one
-of several identically-named people.
+A staged `person` candidate has **no `person_id` field**, so a person who shares a
+normalized canonical name with another stored person needs care. Accepting such a person
+candidate would fail: on commit the pipeline re-derives it by `canonical_name` and calls
+`remember_person`, which raises `ambiguous_person` for the duplicate name even when a
+handle bound the staged row. But a dependent record for that person **can** still be
+committed: give the person candidate a unique **handle** so the stager binds its
+`matched_person_id` to the existing record, stage the dependent
+(fact/affiliation/interaction) referencing it, and at commit **accept only the dependent
+row, leaving the person row unaccepted**. The pipeline resolves the reference to the
+existing person from `matched_person_id` without re-minting the person, so the dependent
+commits cleanly. Only when the person has no unique handle to bind `matched_person_id` is
+staging a dependent for one of several identically-named people unsupported — report that
+instead.
 
 The direct `remember_person` write in path 1 is different: it does not go through that
 commit path, and its `name` lookup matches **any** alias kind, so a non-unique canonical

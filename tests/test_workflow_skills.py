@@ -188,16 +188,26 @@ class TestRememberWorkflow:
         assert "alias" in lowered
         assert "nothing was recorded" in lowered
 
-    def test_staging_duplicate_name_reported_unsupported(self) -> None:
-        # Regression: CommitImport._commit_person re-derives a matched person by
-        # canonical name and calls remember_person, which raises ambiguous_person for a
-        # duplicate name — so a unique handle does NOT make the batch committable, and
-        # staging must be reported unsupported for duplicate canonical names.
+    def test_staging_duplicate_name_dependent_only_commit(self) -> None:
+        # Regression: accepting a duplicate-canonical-name person candidate fails
+        # (commit re-derives by canonical name -> ambiguous_person), but a dependent
+        # record commits when the person is bound via a unique handle and its own row is
+        # left unaccepted (CommitImport._existing_resolution uses matched_person_id).
         lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
 
-        assert "person_id" in lowered
-        assert "cannot be committed" in lowered
         assert "ambiguous_person" in lowered
+        assert "matched_person_id" in lowered
+        assert "accept only the dependent" in lowered
+        assert "unaccepted" in lowered
+
+    def test_prior_context_derived_content_always_stages(self) -> None:
+        # Regression: the M10 contract keeps prior-context-derived content behind the
+        # review gate, so even an extracted identity detail must stage, not direct-write.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "prior context always stages" in lowered
+        assert "pending review" in lowered
+        assert "directly in this invocation" in lowered
 
     def test_direct_write_reports_duplicate_name_limitation(self) -> None:
         # Regression: remember_person has no person_id parameter, but its name lookup
@@ -227,6 +237,9 @@ class TestRememberWorkflow:
         assert "is_self" in lowered
         assert "omit the self" in lowered
         assert "not a new person" in lowered
+        # Self as a fact/affiliation subject needs a person_ref bound to the self record.
+        assert "fact or affiliation subject" in lowered
+        assert "canonical name or handle" in lowered
 
     def test_summary_fast_path_excludes_structured_records(self) -> None:
         # Regression: a request carrying an affiliation/fact/interaction must route the
