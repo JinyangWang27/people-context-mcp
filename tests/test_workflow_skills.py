@@ -178,6 +178,26 @@ class TestRememberWorkflow:
         assert "provenance" in lowered
         assert "never" in lowered and "source" in lowered
 
+    def test_self_already_exists_retries_to_record_alias(self) -> None:
+        # Regression: "I also go by John" hits self_already_exists; the workflow must
+        # retry against the existing self identity to record the alias, not drop it.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "self_already_exists" in lowered
+        assert "retry" in lowered
+        assert "alias" in lowered
+        assert "nothing was recorded" in lowered
+
+    def test_non_unique_name_uses_handle_or_reports_limitation(self) -> None:
+        # Regression: a staged person candidate has no id field, so a resolved
+        # selection among duplicate normalized names cannot be represented; the
+        # workflow must use a unique handle or report the limitation.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "no person" in lowered and "id field" in lowered
+        assert "unique handle" in lowered
+        assert "fail to commit" in lowered or "uncommittable" in lowered
+
     def test_resolves_referenced_people_before_staging(self) -> None:
         # Regression: the stager matches only exact normalized names/handles, so a
         # partial reference must be resolved to its canonical identity before staging

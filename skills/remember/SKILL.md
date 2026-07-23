@@ -37,8 +37,16 @@ with that person's **canonical name** so the existing record is updated (its loo
 matches only the exact normalized `name`, not the supplied aliases, so a partial name
 like `Alice` would otherwise create a second record beside `Alice Smith`). Call
 `remember_person` with those fields only. If it returns `ambiguous_person`, present the
-returned candidates and let the user pick rather than guessing; if it returns
-`self_already_exists`, report the existing self record instead of creating another.
+returned candidates and let the user pick rather than guessing.
+
+If it returns `self_already_exists`, do not treat the error as done — the user cannot
+be resolved by a pronoun like "I", so a self assertion such as "I also go by John"
+naturally hits this error. The error carries the existing self's canonical name. When
+the assertion adds an alias or handle to the user (a new "also known as" / "goes by"),
+**retry** `remember_person` against that existing canonical name with the new value in
+`aliases`, so the alias is actually recorded on the self record. Only when there is
+nothing new to add, tell the user that nothing was recorded because their self record
+already exists.
 
 ### 2. Extracted facts, affiliations, or interactions → resolve first, then stage
 
@@ -62,6 +70,17 @@ or handle, so a partial reference like `Alice` would otherwise be recorded as a 
 duplicate** of the stored `Alice Smith`. If resolution is `ambiguous`, surface the
 candidates and let the user choose before writing; do not guess. If resolution is
 empty, the person is genuinely new — create or stage them as new.
+
+A staged `person` candidate can carry only a `name` and `aliases` — it has **no person
+id field** — and the stager binds it to an existing record only when that name or a
+handle matches exactly one person. So when two stored people share the same normalized
+canonical name, the resolved `person_id` cannot be represented in a candidate and the
+name alone is ambiguous: prefer putting the resolved person's **unique handle** in the
+candidate's `aliases` so the batch binds to exactly them. If the resolved person shares
+a normalized canonical name with another and has no unique handle, staging cannot
+target them unambiguously and the batch would fail to commit — report this limitation
+instead of staging an uncommittable batch. (The direct `remember_person` write in
+path 1 is unaffected: it disambiguates via the confirmed canonical identity.)
 
 ### 3. Anything that fits neither path → report the limitation, do not force it
 
