@@ -29,8 +29,9 @@ Non-goals:
 
 ### `people-context doctor`
 
-Add `ports/curation.py::CurationReader`, `adapters/sqlite/curation_reader.py`, and `app/run_doctor.py`. SQL finds
-candidate evidence; app policy assigns stable codes, ordering, messages, and suggested actions.
+Add `ports/curation.py::CurationReader`, `adapters/sqlite/curation_reader.py`, and
+`app/records/doctor.py`. SQL finds candidate evidence; app policy assigns stable codes, ordering, messages, and
+suggested actions.
 
 Finding classes:
 
@@ -56,8 +57,8 @@ rule. `--only CODE[,CODE...]` filters after validation of known codes.
 
 ### `people-context stats`
 
-Add aggregate-only `ports/stats.py::StatsReader`, its SQLite adapter, and `app/compute_stats.py`. The adapter returns
-counts/distributions only, never record text, device display names, or absolute paths:
+Add aggregate-only `ports/stats.py::StatsReader`, its SQLite adapter, and `app/context/stats.py`. The adapter
+returns counts/distributions only, never record text, device display names, or absolute paths:
 
 - entity counts for documented tables;
 - alias-kind distribution;

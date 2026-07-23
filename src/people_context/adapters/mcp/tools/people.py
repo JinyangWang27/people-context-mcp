@@ -13,26 +13,26 @@ from typing import TYPE_CHECKING, Any
 from mcp.types import ToolAnnotations
 
 from people_context.adapters.mcp.security import process_elevation_enabled
-from people_context.app import (
+from people_context.app.people import (
     AliasInput,
     AmbiguousPersonError,
     RememberPersonInput,
     ResolutionHints,
     SelfAlreadyExistsError,
-    SemanticSearchValidationError,
 )
+from people_context.app.semantic import SemanticSearchValidationError
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import FastMCP
 
-    from people_context.adapters.mcp.server import ToolDeps
+    from people_context.adapters.runtime import RuntimeUseCases
 
 _READ_ONLY = ToolAnnotations(readOnlyHint=True)
 _WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 _SENSITIVE_CONTEXT_ENV = "PEOPLE_CONTEXT_MCP_ENABLE_SENSITIVE"
 
 
-def register(mcp: FastMCP, deps: ToolDeps) -> None:
+def register(mcp: FastMCP, deps: RuntimeUseCases) -> None:
     """Register the resolve/search/remember tools bound to the given use cases."""
 
     @mcp.tool(annotations=_READ_ONLY)

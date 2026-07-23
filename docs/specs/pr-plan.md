@@ -76,7 +76,7 @@ Check the matching box only in the PR that delivers it.
 ## M9 — Cold start & onboarding
 
 - [x] **M9.1 — Relocate import router without dropping `mbox`**
-  - **Scope:** Move explicit dispatch to `adapters/import_router.py`.
+  - **Scope:** Move explicit dispatch to `adapters/importers/router.py`.
   - **Acceptance:** `email`/`mbox` → email, `vcard` → vCard, unknown → `invalid_source_type`; preserve `mbox`
     path-only semantics and E2E behavior.
   - **Out:** ICS and LinkedIn implementations.
@@ -112,7 +112,7 @@ Check the matching box only in the PR that delivers it.
   - **Acceptance:** never commits extracted batches automatically; validation/scripted transcript pass.
   - **Out:** user-invocable workflows and server instructions.
 
-- [ ] **M10.2 — Add who/remember/reminders workflows**
+- [x] **M10.2 — Add who/remember/reminders workflows**
   - **Scope:** Three user workflows composing existing tools.
   - **Acceptance:** `who` resolves then reads only when unambiguous; `remember` distinguishes assertion/extraction;
     `reminders` resolves optional person; no elevated tools.

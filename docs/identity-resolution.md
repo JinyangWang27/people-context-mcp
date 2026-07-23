@@ -1,6 +1,6 @@
 # Identity Resolution
 
-This document describes the identity resolution pipeline implemented by `app/resolve_person.py`
+This document describes the identity resolution pipeline implemented by `app/people/resolve.py`
 (`ResolvePerson`), used by the `resolve_person` MCP tool and, in a broader form, by `search_people`. The goal
 is to answer "who does this name refer to, in this user's data" deterministically and explainably, rather
 than as an opaque similarity score.

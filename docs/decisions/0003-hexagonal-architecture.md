@@ -18,10 +18,12 @@ required the codebase to follow SOLID throughout (see [docs/architecture.md](../
 Structure the codebase as a hexagonal (ports & adapters) system: a `domain` + `app` core with **zero**
 imports from the MCP SDK or `sqlite3`, a set of narrow `typing.Protocol` ports (`PersonReader`,
 `PersonWriter`, `AuditLog`, `Clock`) that the core depends on, and adapters (`adapters/sqlite`,
-`adapters/mcp`, `adapters/importers`, `cli.py`) that implement those ports and handle all I/O. Dependencies
-point inward only (`adapters → ports → app → domain`); wiring — constructing concrete adapters and injecting
-them into use cases — happens exclusively at entrypoints (`adapters/mcp/server.py:build_server`,
-`cli.py:main`). Full detail, including the layer diagram and the SOLID mapping, is in
+`adapters/mcp`, `adapters/importers`, `cli/`) that implement those ports and handle all I/O. Application use
+cases are grouped into cohesive capability packages rather than mechanically one file per class. Dependencies
+point inward only: adapters and process entrypoints depend on `app`; `app` depends on `ports` and `domain`;
+and `ports` depends on `domain`. Wiring — constructing concrete adapters and injecting them into use cases —
+happens in the shared `adapters/runtime.py` composition root. Full detail, including the layer diagram and
+the SOLID mapping, is in
 [docs/architecture.md](../architecture.md).
 
 ## Consequences
@@ -34,6 +36,7 @@ them into use cases — happens exclusively at entrypoints (`adapters/mcp/server
 - The CLI and the MCP server share the exact same use case classes, so a person created via
   `people-context` and a person created via `remember_person` are recorded, audited, and provenance-tracked
   identically — there is no risk of the two surfaces drifting in behaviour.
+- A standard-library AST test enforces core layer dependencies and rejects internal runtime import cycles.
 - The cost of this decision is indirection: even the M0 vertical slice (`resolve_person`, `search_people`,
   `remember_person`) is spread across `domain`, `app`, `ports`, and `adapters/sqlite` plus
   `adapters/mcp`, rather than living in one file. This is accepted deliberately, in exchange for the adapter
