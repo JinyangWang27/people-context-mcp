@@ -9,7 +9,7 @@ from people_context.domain.person import AliasKind
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argparse parser and its subcommands."""
-    parser = argparse.ArgumentParser(prog="people-context", description="Inspect and search your people data.")
+    parser = argparse.ArgumentParser(prog="pctx", description="Inspect and search your people data.")
     parser.add_argument("--db", default=None, help="Explicit database path, overriding other resolution sources.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

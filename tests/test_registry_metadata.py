@@ -48,10 +48,9 @@ def test_single_pypi_package_entry() -> None:
     package = packages[0]
     assert package["registryType"] == "pypi"
     assert package["registryBaseUrl"] == "https://pypi.org"
-    # The identifier is the console-script command uvx executes. The server script
-    # `people-context-mcp` differs from the primary distribution name, so the
-    # identifier is the command and `--from people-context` installs the primary.
-    assert package["identifier"] == "people-context-mcp"
+    # The identifier matches both the primary distribution and its MCP server
+    # console script, so Registry ownership and execution use the same name.
+    assert package["identifier"] == "people-context"
 
 
 def test_package_transport_is_valid_stdio() -> None:
@@ -99,7 +98,7 @@ def test_package_reconstructs_canonical_uvx_invocation() -> None:
         "uvx",
         "--from",
         f"people-context=={project_version}",
-        "people-context-mcp",
+        "people-context",
     ]
 
 
@@ -108,9 +107,7 @@ def test_pinned_primary_requirement_stays_synchronized() -> None:
     project_version = _project_version()
 
     (from_argument,) = [
-        argument
-        for argument in package.get("runtimeArguments", [])
-        if argument.get("name") == "--from"
+        argument for argument in package.get("runtimeArguments", []) if argument.get("name") == "--from"
     ]
     requirement = from_argument["value"]
     name, _, pinned_version = requirement.partition("==")
@@ -119,13 +116,11 @@ def test_pinned_primary_requirement_stays_synchronized() -> None:
     assert pinned_version == project_version == _server_json()["version"]
 
 
-def test_ownership_marker_present_in_repository_and_identifier_package_readmes() -> None:
+def test_ownership_marker_present_in_primary_distribution_readme() -> None:
     marker = f"<!-- mcp-name: {REGISTRY_NAMESPACE} -->"
 
     # Repository README (the primary distribution's packaged long description).
     assert marker in (ROOT / "README.md").read_text(encoding="utf-8")
-    # The `identifier` package's packaged README, which the Registry links on PyPI.
-    assert marker in (ROOT / "compat/people-context-mcp/README.md").read_text(encoding="utf-8")
 
 
 def test_glama_metadata_is_well_formed() -> None:

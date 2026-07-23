@@ -104,7 +104,7 @@ installation's identity: two live copies of the same file (Dropbox/iCloud folder
 onto two machines) share one device id and interleave its persisted HLC state, corrupting the changelog's
 per-origin ordering that future sync will rely on. Moving the file once to a new machine is fine; running two
 copies concurrently is not. Device re-registration/copy detection is deliberately deferred to the sync
-milestone. Use `people-context export` (or the vault export) to move data between machines today.
+milestone. Use `pctx export` (or the vault export) to move data between machines today.
 
 Every M7 write path—relationship create/update dedupe, custom vocabulary add, and applied legacy
 normalization—uses the same transactional `audit_mutation` capture seam as M6.
@@ -112,11 +112,11 @@ normalization—uses the same transactional `audit_mutation` capture seam as M6.
 ## Search indexes
 
 `person_search` is an FTS5 index over active canonical names and aliases. Repository writes maintain it;
-`people-context reindex` repairs it after direct SQL changes.
+`pctx reindex` repairs it after direct SQL changes.
 
 With the optional semantic extra, `semantic_vectors` is a derived same-file `sqlite-vec` table containing
 active-person documents and eligible public/personal interaction summaries. Sensitive/restricted interactions
-are excluded. `people-context reindex --semantic` explicitly downloads the pinned model when needed and
+are excluded. `pctx reindex --semantic` explicitly downloads the pinned model when needed and
 atomically replaces vectors and model metadata.
 
 ## Facts, observations, and traits

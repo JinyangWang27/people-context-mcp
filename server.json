@@ -7,12 +7,12 @@
     "source": "github",
     "id": "R_kgDOTan0Jg"
   },
-  "version": "0.2.0",
+  "version": "0.3.0",
   "packages": [
     {
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
-      "identifier": "people-context-mcp",
+      "identifier": "people-context",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
@@ -21,7 +21,7 @@
         {
           "type": "named",
           "name": "--from",
-          "value": "people-context==0.2.0"
+          "value": "people-context==0.3.0"
         }
       ]
     }

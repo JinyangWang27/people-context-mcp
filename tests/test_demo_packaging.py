@@ -66,7 +66,7 @@ def test_wheel_installs_demo_seed_and_runs_outside_checkout(tmp_path: Path) -> N
     command_env["XDG_DATA_HOME"] = str(tmp_path / "data")
     command_env["PEOPLE_CONTEXT_DB"] = str(tmp_path / "must-not-be-used.db")
     demo = subprocess.run(
-        [str(environment / "bin" / "people-context"), "demo", "--reset"],
+        [str(environment / "bin" / "pctx"), "demo", "--reset"],
         cwd=outside_checkout,
         env=command_env,
         check=False,

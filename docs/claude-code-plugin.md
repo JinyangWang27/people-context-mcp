@@ -46,8 +46,8 @@ The server resolves its database path with the standard chain documented in [cli
 agent-workspace directory, and finally the XDG data default `~/.local/share/people-context/people.db`.
 The plugin deliberately passes no `--db` flag, so the database lands at that XDG default. This location
 lives in the user's home directory — entirely outside the plugin's installed copy — so it survives
-marketplace updates, reinstalls, and uninstalls, and it is the same file the `people-context` CLI reads
-by default, so `people-context show` and `people-context export` work against the plugin's data with no
+marketplace updates, reinstalls, and uninstalls, and it is the same file the `pctx` CLI reads
+by default, so `pctx show` and `pctx export` work against the plugin's data with no
 extra configuration. To isolate or relocate the store, set `PEOPLE_CONTEXT_DB` in the environment that
 launches Claude Code.
 
@@ -112,7 +112,7 @@ The default plugin configuration deliberately does not set either high-disclosur
 
 - `get_person_context` returns only public and personal records; sensitive and restricted records are unavailable.
 - `get_sensitive_person_context` is not registered unless the operator starts a different server process with `PEOPLE_CONTEXT_MCP_ENABLE_SENSITIVE=1`.
-- `export_data` is not registered unless the operator starts a different server process with `PEOPLE_CONTEXT_MCP_ENABLE_EXPORT=1`. Use the human-operated `people-context export` CLI for routine portability.
+- `export_data` is not registered unless the operator starts a different server process with `PEOPLE_CONTEXT_MCP_ENABLE_EXPORT=1`. Use the human-operated `pctx export` CLI for routine portability.
 
 MCP annotations are advisory client metadata, not authorization. The process-level capability gates above are what prevent prompt content from widening the disclosure boundary. Email and mbox Subject values are treated as attacker-controlled input and replaced with the neutral summary `Email correspondence` before staging or persistence.
 

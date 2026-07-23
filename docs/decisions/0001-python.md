@@ -17,8 +17,8 @@ Use **Python ≥ 3.11**, with the official `mcp` Python SDK (`FastMCP`) for the 
 domain models and tool I/O schemas, `python-ulid` for ID generation, the standard library `sqlite3` module
 for persistence (no external database driver dependency), `pytest` for tests, and `ruff` for linting
 (`line-length = 120`). The project is packaged and run with `uv` (`pyproject.toml`, `hatchling` build
-backend); clients launch it via `uv run people-context-mcp` (or, from PyPI,
-`uvx --from people-context people-context-mcp`).
+backend); clients launch it via `uv run people-context` (or, from PyPI,
+`uvx --from people-context people-context`). The `people-context-mcp` server alias remains available.
 
 ## Consequences
 
@@ -29,8 +29,8 @@ backend); clients launch it via `uv run people-context-mcp` (or, from PyPI,
   security or compatibility — see [0002-sqlite.md](0002-sqlite.md).
 - Pydantic v2 models double as both domain value objects and MCP tool I/O schemas, since the `mcp` SDK
   already depends on Pydantic — no separate schema library is needed.
-- `uv` gives fast, reproducible installs and a single `pyproject.toml` source of truth for both the server
-  script (`people-context-mcp`) and the CLI script (`people-context`).
+- `uv` gives fast, reproducible installs and a single `pyproject.toml` source of truth for the package-aligned
+  server script (`people-context`), its `people-context-mcp` compatibility alias, and the human CLI script (`pctx`).
 - Python's dynamic typing means the project leans on `mypy`/`ruff`-style static checks and full type hints
   (enforced by convention, `from __future__ import annotations` where useful) rather than a compiler to
   catch type errors — a deliberate trade-off against Go/Rust's stronger static guarantees, in exchange for

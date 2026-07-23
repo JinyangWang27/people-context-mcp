@@ -73,7 +73,6 @@ def build_server(db_path: str | Path | None = None) -> FastMCP:
 def _build_parser() -> argparse.ArgumentParser:
     """Build the server entrypoint parser without constructing application state."""
     parser = argparse.ArgumentParser(
-        prog="people-context-mcp",
         description="Local-first MCP server with contextual knowledge about the people in your life.",
     )
     parser.add_argument(

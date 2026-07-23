@@ -26,26 +26,14 @@ jobs:
       - name: Build primary distribution
         run: uv build
 
-      - name: Build legacy compatibility distribution
-        run: |
-          cd compat/people-context-mcp
-          uv build --out-dir "$GITHUB_WORKSPACE/dist-legacy"
-
       - name: Verify distribution metadata
-        run: uvx --from twine==6.2.0 twine check dist/* dist-legacy/*
+        run: uvx --from twine==6.2.0 twine check dist/*
 
       - name: Store primary distributions
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: python-package-distributions
           path: dist/
-          if-no-files-found: error
-
-      - name: Store legacy compatibility distributions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: python-legacy-compat-distributions
-          path: dist-legacy/
           if-no-files-found: error
 
   publish:
@@ -95,25 +83,3 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${GITHUB_REF_NAME}" "${GITHUB_WORKSPACE}/dist-mcpb/people-context.mcpb" --clobber
-
-  publish-legacy:
-    name: Publish people-context-mcp compatibility package
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/people-context-mcp
-    permissions:
-      contents: read
-      id-token: write
-    steps:
-      - name: Download legacy compatibility distributions
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: python-legacy-compat-distributions
-          path: dist/
-
-      - name: Publish compatibility distribution once
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # v1.14.1
-        with:
-          skip-existing: true

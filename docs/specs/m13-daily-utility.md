@@ -13,7 +13,7 @@ export, and a local changelog tail without adding recorded data or a model-calla
 
 In scope:
 
-- read-only `get_stale_relationships` MCP tool and `people-context stale` CLI;
+- read-only `get_stale_relationships` MCP tool and `pctx stale` CLI;
 - read-only `upcoming_dates` MCP tool and CLI;
 - meeting-preparation content in the M10 skill;
 - CLI-only deterministic `reminders-ics` export;
@@ -27,7 +27,7 @@ Non-goals:
 
 ## Design
 
-### `get_stale_relationships` / `people-context stale`
+### `get_stale_relationships` / `pctx stale`
 
 Add `ports/insights.py::RecencyReader`, its SQLite implementation, and
 `GetStaleRelationships(RecencyReader, Clock)`. The adapter returns stored aggregate signal only; the app use case
@@ -94,7 +94,7 @@ Extend the M10 usage skill: resolve each attendee, fetch bounded `get_person_con
 `get_communication_guidance`, list open reminders for each resolved person, and compose a brief. This is prompt
 content only and adds no server tool.
 
-### `people-context reminders-ics`
+### `pctx reminders-ics`
 
 Serialize one `VTODO` for each active reminder whose `due_at` and `created_at` are both timezone-aware:
 
@@ -119,7 +119,7 @@ Write through `adapters/filesystem/private_file.py::atomic_write_private_text`, 
 the old `os.open(..., O_TRUNC, 0o600)` pattern: overwriting an existing permissive file must still result in a
 private atomic file, and a failed write must preserve the prior destination.
 
-### `people-context watch`
+### `pctx watch`
 
 Add additive `Changelog.list_entries_after(cursor, limit)` returning rows strictly after the full comparison-key
 cursor `(hlc_physical_ms, hlc_logical, device_id, op_id)` in ascending order. Existing descending
@@ -154,10 +154,10 @@ Both new MCP tools are registered `readOnlyHint=true`:
 | `upcoming_dates` | `window_days=30`, `person_id?` | Ordered entries + `skipped_unparseable`. |
 
 ```text
-uv run people-context stale [--category C] [--threshold-days N] [--limit N]
-uv run people-context upcoming [--window-days N] [--person PERSON]
-uv run people-context reminders-ics --output FILE
-uv run people-context watch [--interval SECONDS] [--from-start]
+uv run pctx stale [--category C] [--threshold-days N] [--limit N]
+uv run pctx upcoming [--window-days N] [--person PERSON]
+uv run pctx reminders-ics --output FILE
+uv run pctx watch [--interval SECONDS] [--from-start]
 ```
 
 ## Security and privacy

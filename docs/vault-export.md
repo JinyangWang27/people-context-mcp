@@ -3,7 +3,7 @@
 M7 provides a human-operated CLI export for a relationship-oriented Obsidian vault:
 
 ```bash
-uv run people-context export-vault --output /path/to/vault
+uv run pctx export-vault --output /path/to/vault
 ```
 
 There is no MCP vault-export tool in v1. Writing an arbitrary directory from an MCP call requires a separate
@@ -92,7 +92,7 @@ By default, facts marked `sensitive` or `restricted` are excluded. Include them 
 intent:
 
 ```bash
-uv run people-context export-vault --output /path/to/vault --include-sensitive
+uv run pctx export-vault --output /path/to/vault --include-sensitive
 ```
 
 **Exporting moves data outside the server's disclosure controls.** Once Markdown files exist, filesystem

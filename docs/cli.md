@@ -1,6 +1,6 @@
 # CLI
 
-`people-context` is the human-operated companion to the MCP server. It uses the same application use cases for
+`pctx` is the human-operated companion to the MCP server. It uses the same application use cases for
 curation, so validation, audit, HLC, and changelog capture match MCP writes.
 
 ## Global option
@@ -36,7 +36,7 @@ curation, so validation, audit, HLC, and changelog capture match MCP writes.
 ## Onboarding
 
 ```bash
-uv run people-context init
+uv run pctx init
 ```
 
 On a fresh database, `init` asks for a canonical self name and optional comma-separated email handles. On a
@@ -49,7 +49,7 @@ one-line communication philosophy is prompted last.
 ## Packaged demo
 
 ```bash
-uv run people-context demo --reset
+uv run pctx demo --reset
 ```
 
 The demo always uses the absolute `{XDG_DATA_HOME or ~/.local/share}/people-context/demo.db` path. It ignores the
@@ -63,20 +63,20 @@ and concrete `resolve_person`, `get_relationship_graph`, and `find_connection` c
 List seeded/custom rows and uncategorized stored types:
 
 ```bash
-uv run people-context relationship-types
+uv run pctx relationship-types
 ```
 
 Add a symmetric custom type with repeatable synonyms:
 
 ```bash
-uv run people-context relationship-types add co_founder_of \
+uv run pctx relationship-types add co_founder_of \
   --category professional --symmetric --synonym cofounder
 ```
 
 Add an inverse pair:
 
 ```bash
-uv run people-context relationship-types add advises \
+uv run pctx relationship-types add advises \
   --category professional --inverse advised_by
 ```
 
@@ -89,13 +89,13 @@ through the M6 audit/changelog seam; migration seeds are reference data and are 
 Migration 003 does not rewrite stored edges. Preview changes:
 
 ```bash
-uv run people-context normalize-relationships
+uv run pctx normalize-relationships
 ```
 
 Apply them:
 
 ```bash
-uv run people-context normalize-relationships --apply
+uv run pctx normalize-relationships --apply
 ```
 
 Dry-run is the default and performs no writes. Apply uses the same canonical policy as `set_relationship` and
@@ -105,7 +105,7 @@ periods are merged; an edge active today is preferred, otherwise the older row i
 ## Vault export
 
 ```bash
-uv run people-context export-vault --output ~/PeopleVault
+uv run pctx export-vault --output ~/PeopleVault
 ```
 
 The destination must be nonexistent, empty, or already contain `.people-context-vault`. A non-empty unmarked

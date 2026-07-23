@@ -13,8 +13,8 @@ finds and explains problems but never auto-fixes them.
 
 In scope:
 
-- CLI-only `people-context doctor` findings;
-- CLI-only `people-context stats` aggregate inventory;
+- CLI-only `pctx doctor` findings;
+- CLI-only `pctx stats` aggregate inventory;
 - additive transliteration-aware resolution detail with unchanged ranking;
 - a fictional-data evaluation harness and use-case gallery.
 
@@ -27,7 +27,7 @@ Non-goals:
 
 ## Design
 
-### `people-context doctor`
+### `pctx doctor`
 
 Add `ports/curation.py::CurationReader`, `adapters/sqlite/curation_reader.py`, and
 `app/records/doctor.py`. SQL finds candidate evidence; app policy assigns stable codes, ordering, messages, and
@@ -44,7 +44,7 @@ Finding classes:
 
 Every finding includes stable ids/evidence and a **structured** suggested action, not an interpolated shell string:
 
-- CLI action: `{ "surface": "cli", "argv": ["people-context", "show", "<person-id>"] }` or delete equivalent;
+- CLI action: `{ "surface": "cli", "argv": ["pctx", "show", "<person-id>"] }` or delete equivalent;
 - MCP operator action: `{ "surface": "mcp", "tool": "merge_people"|"correct_record",
   "arguments": { ...ids... } }`.
 
@@ -55,7 +55,7 @@ exist; non-zero is reserved for errors.
 `doctor --json` is a versioned stable machine interface from its first release and follows the M12 additive-field
 rule. `--only CODE[,CODE...]` filters after validation of known codes.
 
-### `people-context stats`
+### `pctx stats`
 
 Add aggregate-only `ports/stats.py::StatsReader`, its SQLite adapter, and `app/context/stats.py`. The adapter
 returns counts/distributions only, never record text, device display names, or absolute paths:
@@ -107,8 +107,8 @@ additive migration number at implementation time.
 ## CLI / MCP surface changes
 
 ```text
-uv run people-context doctor [--json] [--only CODE[,CODE...]]
-uv run people-context stats [--json] [--include-path]
+uv run pctx doctor [--json] [--only CODE[,CODE...]]
+uv run pctx stats [--json] [--include-path]
 ```
 
 No doctor/stats MCP tools. `resolve_person` gains only optional `match_detail`.

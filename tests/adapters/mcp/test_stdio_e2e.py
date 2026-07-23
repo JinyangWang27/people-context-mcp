@@ -62,7 +62,7 @@ def test_real_stdio_remember_resolve_with_hints_context_then_cli_show(tmp_path: 
     assert context["reminders"][0]["text"] == "Prefer written updates"
 
     shown = subprocess.run(
-        [uv, "run", "people-context", "--db", str(db_path), "show", person_id],
+        [uv, "run", "pctx", "--db", str(db_path), "show", person_id],
         cwd=project_root,
         check=False,
         capture_output=True,
@@ -199,7 +199,7 @@ def test_real_stdio_remember_fact_forget_leaves_redacted_sync_log(tmp_path: Path
     person_id, fact_id = anyio.run(flow)
 
     hidden = subprocess.run(
-        [uv, "run", "people-context", "--db", str(db_path), "sync-log", "--limit", "10"],
+        [uv, "run", "pctx", "--db", str(db_path), "sync-log", "--limit", "10"],
         cwd=project_root,
         check=False,
         capture_output=True,
@@ -213,7 +213,7 @@ def test_real_stdio_remember_fact_forget_leaves_redacted_sync_log(tmp_path: Path
     assert hidden.stdout.index(f"forget  person:{person_id}") < hidden.stdout.index(f"create  fact:{fact_id}")
 
     shown = subprocess.run(
-        [uv, "run", "people-context", "--db", str(db_path), "sync-log", "--payloads"],
+        [uv, "run", "pctx", "--db", str(db_path), "sync-log", "--payloads"],
         cwd=project_root,
         check=False,
         capture_output=True,
@@ -416,7 +416,7 @@ def test_real_stdio_graph_then_cli_vault_export_uses_matching_links(tmp_path: Pa
         [
             uv,
             "run",
-            "people-context",
+            "pctx",
             "--db",
             str(db_path),
             "export-vault",

@@ -64,7 +64,7 @@ repository. Acknowledge the local-permission note above before enabling it.
 Every ordinary client uses one canonical invocation:
 
 ```text
-uvx --from people-context people-context-mcp
+uvx --from people-context people-context
 ```
 
 Only the config file path and root key differ per editor. (The MCPB bundle keeps its native manifest shape and
@@ -79,7 +79,7 @@ Add to `.cursor/mcp.json` (project scope) or `~/.cursor/mcp.json` (global scope)
   "mcpServers": {
     "people-context": {
       "command": "uvx",
-      "args": ["--from", "people-context", "people-context-mcp"]
+      "args": ["--from", "people-context", "people-context"]
     }
   }
 }
@@ -94,7 +94,7 @@ Add to `~/.codeium/windsurf/mcp_config.json`:
   "mcpServers": {
     "people-context": {
       "command": "uvx",
-      "args": ["--from", "people-context", "people-context-mcp"]
+      "args": ["--from", "people-context", "people-context"]
     }
   }
 }
@@ -110,7 +110,7 @@ Add to `.vscode/mcp.json` (workspace scope). VS Code uses the `servers` key and 
     "people-context": {
       "type": "stdio",
       "command": "uvx",
-      "args": ["--from", "people-context", "people-context-mcp"]
+      "args": ["--from", "people-context", "people-context"]
     }
   }
 }

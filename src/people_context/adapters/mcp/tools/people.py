@@ -108,7 +108,7 @@ def register(mcp: FastMCP, deps: RuntimeUseCases) -> None:
     ) -> dict[str, Any]:
         """Search active people and safe interaction summaries by multilingual semantic similarity.
 
-        This optional local search requires an explicit `people-context reindex --semantic` first. It never
+        This optional local search requires an explicit `pctx reindex --semantic` first. It never
         downloads a model while serving a query and refuses to mix vectors from different model revisions.
         """
         try:

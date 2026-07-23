@@ -204,7 +204,7 @@ def test_semantic_search_before_reindex_is_not_available_without_network(
         "status": "not_available",
         "reason": "semantic index metadata is missing; run semantic reindex",
         "install": "uv sync --extra semantic",
-        "retry": "uv run people-context reindex --semantic",
+        "retry": "uv run pctx reindex --semantic",
     }
     assert network_calls == []
 

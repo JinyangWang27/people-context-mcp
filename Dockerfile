@@ -3,7 +3,7 @@
 # Optional, non-root, local-stdio container image for people-context.
 #
 # This image is a convenience distribution of the same stdio MCP server that
-# `uvx --from people-context people-context-mcp` runs. It is never the default or
+# `uvx --from people-context people-context` runs. It is never the default or
 # only supported way to run the project, and it is not a security sandbox: the
 # server executes local Python with the container user's filesystem permissions.
 #
@@ -67,5 +67,5 @@ WORKDIR /app
 
 # Default to the stdio MCP server. Loopback HTTP remains opt-in through arguments
 # and is never the container default; the human-operated CLI is available by
-# overriding the entrypoint with `people-context`.
+# overriding the entrypoint with `pctx`.
 ENTRYPOINT ["people-context-mcp"]

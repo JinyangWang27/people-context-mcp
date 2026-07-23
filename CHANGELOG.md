@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-23
+
+### Changed
+
+- Made the package-aligned `people-context` command launch the MCP server and retained `people-context-mcp` as an
+  equivalent server alias.
+- Renamed the human-operated CLI to the concise `pctx` command.
+- Pointed MCP Registry metadata at the primary `people-context` PyPI distribution.
+- Bumped the repository-coupled Codex plugin manifest to `0.3.0`.
+
+### Removed
+
+- Removed the legacy `people-context-mcp` PyPI compatibility distribution and its release job.
+
 ## [0.2.0] - 2026-07-23
 
 ### Added
@@ -47,6 +61,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - Initial local-first People Context MCP server release.
 
+[0.3.0]: https://github.com/JinyangWang27/people-context/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/JinyangWang27/people-context/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/JinyangWang27/people-context/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/JinyangWang27/people-context/releases/tag/v0.1.0

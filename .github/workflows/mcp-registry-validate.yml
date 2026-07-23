@@ -71,7 +71,7 @@ jobs:
           assert len(packages) == 1, packages
           package = packages[0]
           assert package["registryType"] == "pypi", package
-          assert package["identifier"] == "people-context-mcp", package
+          assert package["identifier"] == "people-context", package
           assert package["transport"] == {"type": "stdio"}, package
 
           def tokens(arguments):
@@ -91,11 +91,10 @@ jobs:
               + [package["identifier"]]
               + tokens(package.get("packageArguments", []))
           )
-          expected = ["uvx", "--from", f"people-context=={project_version}", "people-context-mcp"]
+          expected = ["uvx", "--from", f"people-context=={project_version}", "people-context"]
           assert command == expected, (command, expected)
 
           marker = f"<!-- mcp-name: {server['name']} -->"
-          for readme in ("README.md", "compat/people-context-mcp/README.md"):
-              assert marker in Path(readme).read_text(encoding="utf-8"), readme
+          assert marker in Path("README.md").read_text(encoding="utf-8")
           print("server.json command reconstruction and marker checks passed")
           PY

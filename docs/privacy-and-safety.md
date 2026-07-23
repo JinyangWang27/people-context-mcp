@@ -10,7 +10,7 @@ The entire dataset lives in a single SQLite file the user owns and controls (see
 [docs/data-model.md](data-model.md) and [docs/cli.md](cli.md) for its exact location and how to inspect it
 directly). The server does not phone home, sync, or have remote accounts. Stdio serving, loopback HTTP
 serving, ordinary CLI commands, and `semantic_search` make no outbound requests. The sole in-project network
-path is explicit: `people-context reindex --semantic` may download the pinned multilingual model after
+path is explicit: `pctx reindex --semantic` may download the pinned multilingual model after
 printing its identity, URL, approximately 512 MB size, and cache directory. Search uses
 `local_files_only=True`; missing cache state returns `not_available` instead of downloading. This preserves
 the no-surprise-network rule while keeping semantic retrieval optional.
@@ -102,7 +102,7 @@ See [docs/data-model.md](data-model.md#soft-delete-vs-forget) for the schema-lev
 
 ## Export for portability
 
-The human-operated `people-context export` CLI produces a deterministic, domain-shaped JSON export of the
+The human-operated `pctx export` CLI produces a deterministic, domain-shaped JSON export of the
 full portable dataset, including soft-deleted people, interaction participant ids, preference text, and
 decoded audit payloads. Derived `person_search`/semantic vec0 rows and pending `import_staging` candidates are
 excluded. M6 also excludes `devices`, `changelog`, and `sync_conflicts`: this export remains the byte-compatible

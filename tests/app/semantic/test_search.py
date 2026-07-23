@@ -42,7 +42,7 @@ def test_missing_metadata_is_not_available_without_embedding() -> None:
         "status": "not_available",
         "reason": "semantic index metadata is missing; run semantic reindex",
         "install": "uv sync --extra semantic",
-        "retry": "uv run people-context reindex --semantic",
+        "retry": "uv run pctx reindex --semantic",
     }
     assert provider.calls == []
 
@@ -57,7 +57,7 @@ def test_model_mismatch_refuses_before_embedding() -> None:
         "reason": "stored semantic vectors do not match the configured embedding model",
         "stored_model_id": "old/model",
         "current_model_id": _MODEL_ID,
-        "retry": "uv run people-context reindex --semantic",
+        "retry": "uv run pctx reindex --semantic",
     }
     assert provider.calls == []
 

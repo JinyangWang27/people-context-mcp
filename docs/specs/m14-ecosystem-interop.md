@@ -13,8 +13,8 @@ private-file helper provides the canonical export safety primitive.
 
 In scope:
 
-- `people-context brief PERSON [--include-sensitive] [--json] [--output FILE]`;
-- deterministic `people-context export-vcard`;
+- `pctx brief PERSON [--include-sensitive] [--json] [--output FILE]`;
+- deterministic `pctx export-vcard`;
 - Outlook contacts CSV and WhatsApp plaintext-export extractors;
 - a desktop-only read-only Obsidian plugin under `obsidian-plugin/`.
 
@@ -28,7 +28,7 @@ Non-goals:
 
 ## Design
 
-### `people-context brief`
+### `pctx brief`
 
 Add `ComposePersonBrief`, composing `GetPersonContext`, `GetCommunicationGuidance`, and `ListReminders` into one
 deterministic Markdown or stable JSON document. `ListReminders` is required because scheduled `follow_up` and
@@ -48,7 +48,7 @@ follows the M12 additive-field compatibility rule. Ordering is stable across peo
 Stdout is the default. `--output` uses
 `adapters/filesystem/private_file.py::atomic_write_private_text`; do not duplicate an `O_TRUNC` writer.
 
-### `people-context export-vcard`
+### `pctx export-vcard`
 
 Add typed export DTOs and a `VCardWriter` Protocol under `ports/vcard.py`,
 `ExportVCard(ExportReader, VCardWriter, Clock)`, and a pure filesystem serializer. The app use case excludes
@@ -121,8 +121,8 @@ accepted source values: `email`, `mbox`, `vcard`, `ics`, `linkedin`, `outlook`, 
 
 The plugin renders live read-only person panes from CLI JSON. It never opens SQLite. It calls:
 
-- `people-context list --json` for the index;
-- `people-context brief <person-id> --json` for details.
+- `pctx list --json` for the index;
+- `pctx brief <person-id> --json` for details.
 
 The detail command always uses the stable id returned by the index, never a display name.
 
@@ -182,9 +182,9 @@ No new MCP tool. `import_content` adds accepted `outlook`/`whatsapp` values and 
 shape remains unchanged. CLI additions:
 
 ```text
-uv run people-context brief PERSON [--include-sensitive] [--json] [--output FILE]
-uv run people-context export-vcard [--output FILE] [--include-sensitive] [--version 4.0]
-uv run people-context list [--all] [--json]
+uv run pctx brief PERSON [--include-sensitive] [--json] [--output FILE]
+uv run pctx export-vcard [--output FILE] [--include-sensitive] [--version 4.0]
+uv run pctx list [--all] [--json]
 ```
 
 `list --json` has a documented versioned/additive schema. By default it excludes soft-deleted people; `--all`
