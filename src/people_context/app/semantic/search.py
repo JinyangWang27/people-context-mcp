@@ -16,7 +16,7 @@ from people_context.ports.semantic import (
 
 _SUPPORTED_KINDS = frozenset({"person", "interaction"})
 _INSTALL = "uv sync --extra semantic"
-_RETRY = "uv run people-context reindex --semantic"
+_RETRY = "uv run pctx reindex --semantic"
 
 
 class SemanticSearchValidationError(ValueError):

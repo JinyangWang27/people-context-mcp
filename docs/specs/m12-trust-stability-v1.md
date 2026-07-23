@@ -64,8 +64,8 @@ Registry package by identifier rather than array position and asserts the semant
 
 Version domains that distribute or wrap the server remain explicit rather than accidentally synchronized:
 
-- `compat/people-context-mcp` is a renamed-distribution shim with its own post-release version; its dependency
-  lower bound already accepts the 1.0 primary package;
+- the primary `people-context` distribution exposes the package-aligned server command, the
+  `people-context-mcp` server alias, and the `pctx` human CLI;
 - `.claude-plugin`, `.codex-plugin`, OpenClaw, and future Obsidian plugin manifests are integration-package
   versions. They are bumped according to their own release/change policy, not mechanically set to the server
   version. If the 1.0 release intentionally publishes one of those artifacts, its own manifest/marketplace
@@ -92,7 +92,7 @@ Add `adapters/sqlite/db.py::open_encrypted_db(path, key)` alongside, not as a pa
 sets the key before reading schema metadata or running migrations, then applies the same foreign-key, WAL,
 busy-timeout, and migration setup. Existing repositories continue to receive an opaque compatible connection.
 
-`people-context-mcp --encrypted` and the global CLI form `people-context --encrypted ...` require
+`people-context-mcp --encrypted` and the global CLI form `pctx --encrypted ...` require
 `PEOPLE_CONTEXT_DB_KEY`. Without the flag, plaintext behavior is unchanged. With the flag and no non-empty key,
 startup refuses and never falls back to plaintext.
 
@@ -122,7 +122,7 @@ Use an “as of YYYY-MM-DD” note and primary vendor documentation. Keep the la
 
 ### README polish
 
-Add a short Demo section between “Why” and “Quick start”, showing the packaged `people-context demo` flow and its
+Add a short Demo section between “Why” and “Quick start”, showing the packaged `pctx demo` flow and its
 dedicated database. Link/path check every referenced asset and command.
 
 ## Migration needs
@@ -132,7 +132,7 @@ No new schema migration. SQLCipher changes the connection-open path, not the log
 ## CLI / MCP surface changes
 
 - `people-context-mcp --encrypted`;
-- global `people-context --encrypted ...`;
+- global `pctx --encrypted ...`;
 - no MCP tool or response-shape changes.
 
 ## Security and privacy

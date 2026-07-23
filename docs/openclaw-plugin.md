@@ -51,7 +51,7 @@ The plugin connects to `http://127.0.0.1:8765/mcp` by default. Configure a diffe
 
 The Python server resolves its database through the standard chain documented in [cli.md](cli.md) and
 [data-model.md](data-model.md). When an OpenClaw workspace exists, that chain can select its
-`people-context/people.db`; run `people-context db-path -v` in the server environment to inspect the selected path.
+`people-context/people.db`; run `pctx db-path -v` in the server environment to inspect the selected path.
 
 The plugin exposes these OpenClaw tools:
 

@@ -38,8 +38,7 @@ uv lock --check
 uv run --locked ruff check .
 uv run --locked --with pytest-cov==7.1.0 pytest --cov=people_context -q
 uv build
-(cd compat/people-context-mcp && uv build --out-dir ../../dist-legacy)
-uvx --from twine==6.2.0 twine check dist/* dist-legacy/*
+uvx --from twine==6.2.0 twine check dist/*
 ```
 
 ## Validate OpenClaw changes

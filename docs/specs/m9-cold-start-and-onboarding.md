@@ -17,8 +17,8 @@ adapters and reuse the existing person/interaction/affiliation/fact vocabulary a
 
 In scope:
 
-- `people-context init`: self-person seeding before optional vCard import, then initial communication philosophy;
-- `people-context demo`: deterministic fictional data in a dedicated non-default database;
+- `pctx init`: self-person seeding before optional vCard import, then initial communication philosophy;
+- `pctx demo`: deterministic fictional data in a dedicated non-default database;
 - `.ics` calendar-attendee import (`source_type="ics"`);
 - LinkedIn connections CSV import (`source_type="linkedin"`);
 - relocating `ImportExtractorRouter` from the vCard module into its own adapter module.
@@ -32,7 +32,7 @@ Non-goals:
 
 ## Design
 
-### `people-context init`
+### `pctx init`
 
 The CLI composition is deliberately ordered so self filtering is active before any contact file is parsed:
 
@@ -49,7 +49,7 @@ This is CLI composition of existing use cases; no new app port is required. The 
 on a non-empty store: refuse before mutation unless the existing state contains one unambiguous self target and the
 user explicitly confirms additive onboarding. It never guesses among same-name people.
 
-### `people-context demo`
+### `pctx demo`
 
 Always use a dedicated demo path and refuse reseeding without `--reset`. Fictional runtime data is generated under
 `src/people_context/` or shipped as declared package data there; production code never reads `tests/fixtures`.
@@ -61,7 +61,7 @@ On success print:
 - installed-package `people-context-mcp` launch command targeting that path;
 - copy-pasteable `resolve_person`, `get_relationship_graph`, and `find_connection` calls using seeded identities.
 
-Acceptance builds/installs the wheel in a clean environment and runs `people-context demo --reset`.
+Acceptance builds/installs the wheel in a clean environment and runs `pctx demo --reset`.
 
 ### Import router relocation
 
@@ -130,8 +130,8 @@ None.
 New CLI commands:
 
 ```text
-uv run people-context init
-uv run people-context demo [--reset]
+uv run pctx init
+uv run pctx demo [--reset]
 ```
 
 The existing free-string `import_content` tool accepts `ics` and `linkedin`; response shape remains

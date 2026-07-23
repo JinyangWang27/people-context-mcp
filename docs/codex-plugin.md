@@ -42,7 +42,7 @@ The plugin passes no `--db` option, so plugin launches use the first matching da
 5. `{XDG_DATA_HOME or ~/.local/share}/people-context/people.db` as the final fallback.
 
 The selected path is outside the installed plugin copy, survives upgrades and uninstallations, and is shared
-with the `people-context` CLI. Run `people-context db-path -v` to inspect the active path and its resolution
+with the `pctx` CLI. Run `pctx db-path -v` to inspect the active path and its resolution
 trace.
 
 ## Security model

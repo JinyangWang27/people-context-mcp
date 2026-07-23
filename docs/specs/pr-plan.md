@@ -47,7 +47,7 @@ Check the matching box only in the PR that delivers it.
 ## M8 — Distribution & reach
 
 - [x] **M8.1 — Verify zero-clone `uvx` install and lead with it**
-  - **Scope:** Verify `uvx --from people-context people-context-mcp --help` plus one real stdio round trip from a
+  - **Scope:** Verify `uvx --from people-context people-context --help` plus one real stdio round trip from a
     clean environment; reorder README Quick start ahead of tool-install and source-checkout paths.
   - **Acceptance:** primary distribution name is `people-context`; commands and evidence are recorded; no behavior
     or package change.

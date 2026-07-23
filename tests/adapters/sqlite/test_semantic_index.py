@@ -130,7 +130,7 @@ def test_failed_incremental_vector_refresh_does_not_roll_back_person() -> None:
 
     assert primary.get(person.id) is not None
     assert len(warnings) == 1
-    assert "run `uv run people-context reindex --semantic`" in warnings[0]
+    assert "run `uv run pctx reindex --semantic`" in warnings[0]
 
 
 def test_metadata_is_stored_under_portable_preference_keys() -> None:

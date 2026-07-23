@@ -100,20 +100,20 @@ Both MCP tools are annotated `readOnlyHint=true`.
 List seeded/custom vocabulary and uncategorized types currently in use:
 
 ```bash
-uv run people-context relationship-types
+uv run pctx relationship-types
 ```
 
 Add a custom symmetric type and synonyms:
 
 ```bash
-uv run people-context relationship-types add co_founder_of \
+uv run pctx relationship-types add co_founder_of \
   --category professional --symmetric --synonym cofounder
 ```
 
 Add an inverse pair:
 
 ```bash
-uv run people-context relationship-types add advises \
+uv run pctx relationship-types add advises \
   --category professional --inverse advised_by --synonym advisor_of
 ```
 
@@ -122,13 +122,13 @@ Vocabulary is add-only in v1; edit and delete are intentionally absent.
 Preview legacy edge canonicalization without writing:
 
 ```bash
-uv run people-context normalize-relationships
+uv run pctx normalize-relationships
 ```
 
 Apply the reported changes:
 
 ```bash
-uv run people-context normalize-relationships --apply
+uv run pctx normalize-relationships --apply
 ```
 
 Canonical duplicates are merged only when their validity periods overlap. A row active today is retained in

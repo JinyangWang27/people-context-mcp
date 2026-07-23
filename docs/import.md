@@ -162,6 +162,6 @@ reported in deterministic input order through `skipped_message_ids` or `skipped_
 
 Accepted import candidates reach ordinary application write use cases and therefore produce the same atomic
 audit and replayable changelog entries as interactive writes. `import_staging` itself remains device-local
-review state and is not captured. The version-1 `people-context export` envelope is unchanged in M6 and does
+review state and is not captured. The version-1 `pctx export` envelope is unchanged in M6 and does
 not include `devices`, `changelog`, or `sync_conflicts`; first-device bootstrap and changelog transfer require
 the trusted snapshot/restore protocol deferred to M7.

@@ -6,7 +6,7 @@ Status: Planned. See [docs/roadmap.md](../roadmap.md#m11--sync-bundle-export-and
 
 M6 added a persisted device identity, hybrid logical clock, and replayable changelog written atomically with
 ordinary mutations. It deliberately did not add exchange, pairing, replay, or bootstrap restore. Copying a live
-SQLite file can duplicate one active device identity, while `people-context export` omits devices, vocabulary,
+SQLite file can duplicate one active device identity, while `pctx export` omits devices, vocabulary,
 the HLC watermark, and the changelog. This milestone ships only the low-risk bootstrap slice: export one complete,
 point-in-time bundle and restore it into a freshly initialized database. Incremental replay between independently
 modified databases remains deferred.
@@ -15,8 +15,8 @@ modified databases remains deferred.
 
 In scope:
 
-- `people-context sync push`: write one complete bootstrap bundle;
-- `people-context sync pull`: restore that bundle into a fresh, baseline-empty database only;
+- `pctx sync push`: write one complete bootstrap bundle;
+- `pctx sync pull`: restore that bundle into a fresh, baseline-empty database only;
 - a single-snapshot `BundleReader`;
 - strict, versioned bundle DTOs and fail-closed validation;
 - a narrow verbatim `BootstrapRestorer` port;
@@ -178,8 +178,8 @@ POSIX.
 ### CLI commands
 
 ```text
-uv run people-context sync push --output DIR
-uv run people-context sync pull --input PATH [--yes]
+uv run pctx sync push --output DIR
+uv run pctx sync pull --input PATH [--yes]
 ```
 
 `push` writes `DIR/people-context-sync-bundle.json` through the private-file helper and prints path, entity counts,

@@ -41,7 +41,7 @@ no external database driver.
 - Semantic vectors are derived, optional, and stored in the same file without a base-schema migration.
   Model id/dimension preferences are replaced atomically with the vectors; portable export retains the
   preferences but excludes derived vec0 storage. Incremental failures never roll back primary data and are
-  repaired by `people-context reindex --semantic`.
+  repaired by `pctx reindex --semantic`.
 
 ## Alternatives considered
 

@@ -97,7 +97,7 @@ Concrete implementations of the ports, plus anything that talks to the outside w
   routing; every importer feeds the shared candidate staging use case described in [docs/import.md](import.md).
 - `adapters/model2vec_embeddings.py`, `adapters/semantic_indexing.py`, and `adapters/sqlite/semantic.py` —
   optional cached embeddings, best-effort lifecycle refresh decorators, and same-file cosine vec0 storage.
-- `cli/` — parser/dispatch and capability command modules for the `people-context` CLI, built on the same
+- `cli/` — parser/dispatch and capability command modules for the `pctx` CLI, built on the same
   application runtime as the MCP tools while preserving `people_context.cli:main`.
 - `adapters/runtime.py` — the shared composition root for SQLite, optional semantic decorators, clocks, and
   application use cases. Process entrypoints inject their own warning sink.
@@ -200,7 +200,7 @@ The two histories remain intentionally different:
 
 Merge writes row-level child effects and a semantic parent manifest under one `transaction_id`. Forget is the
 explicit append-only exception: it hard-deletes primary rows, redacts covered audit and changelog payloads, and
-retains an ID-only forget tombstone indefinitely in M6. `people-context sync-log` is the only new inspection
+retains an ID-only forget tombstone indefinitely in M6. `pctx sync-log` is the only new inspection
 surface; no MCP tool, peer, exchange protocol, or replay engine is introduced.
 
 ## Single-user now, multi-user-safe choices

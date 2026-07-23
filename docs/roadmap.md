@@ -81,7 +81,7 @@ command, without changing server behavior.
 
 **Deliverables:**
 
-- verified zero-clone install: `uvx --from people-context people-context-mcp` against the existing
+- verified zero-clone install: `uvx --from people-context people-context` against the existing
   PyPI-published package;
 - root `server.json` using the official MCP Registry package schema and packaged `mcp-name:` ownership marker,
   plus current metadata/submission coverage for Smithery, PulseMCP, mcp.so, and Glama;
@@ -105,11 +105,11 @@ extract-and-stage import pipeline to the contact sources people actually export 
 
 **Deliverables:**
 
-- `people-context init`: an interactive CLI onboarding command that first seeds the self person through
+- `pctx init`: an interactive CLI onboarding command that first seeds the self person through
   `RememberPerson` with supplied email handles, then optionally runs the existing vCard
   `ImportContent` → `ReviewImport` → `CommitImport` flow, and prompts for an initial communication philosophy;
   the user's own contact card must not create a duplicate self record;
-- `people-context demo`: seeds a small fictional dataset into a dedicated demo database (never the user's real
+- `pctx demo`: seeds a small fictional dataset into a dedicated demo database (never the user's real
   `--db`/resolved path), ships its data in the installed wheel, and prints path-targeted server plus
   `resolve_person`, `get_relationship_graph`, and `find_connection` examples;
 - two new import sources reusing the existing candidate vocabulary with zero schema/review-gate changes: `.ics`
@@ -145,9 +145,9 @@ independently diverged devices remains deferred.
 
 **Deliverables:**
 
-- `people-context sync push --output DIR`: one strict versioned JSON bundle containing a single-transaction
+- `pctx sync push --output DIR`: one strict versioned JSON bundle containing a single-transaction
   snapshot, relationship vocabulary, referenced devices, complete changelog, and HLC watermark;
-- `people-context sync pull --input PATH`: strict format/version/nested validation before preview or writes, then
+- `pctx sync pull --input PATH`: strict format/version/nested validation before preview or writes, then
   empty-target-only atomic `BEGIN IMMEDIATE` restore of vocabulary, retired device history, primary/audit rows,
   and changelog, followed by FTS rebuild and local-HLC advancement;
 - imported device identities are never active and a bundle/local device-id collision is rejected;
@@ -181,14 +181,14 @@ and cloud-memory comparisons.
 
 **Deliverables:**
 
-- read-only `get_stale_relationships` MCP tool and `people-context stale` CLI, computed only over
+- read-only `get_stale_relationships` MCP tool and `pctx stale` CLI, computed only over
   ordinary-disclosure interactions with one row per person and a categories list;
 - read-only `upcoming_dates` MCP tool/CLI over ordinary birthday facts and active reminders, with annual
   month/day projection and real leap-day behavior;
 - a meeting-preparation flow in the M10 skill;
-- deterministic `people-context reminders-ics --output FILE` using the shared atomic private-file writer; dated
+- deterministic `pctx reminders-ics --output FILE` using the shared atomic private-file writer; dated
   reminders remain exported even when an unsupported recurrence rule is omitted and counted;
-- `people-context watch`: local-only JSON-lines changelog tail with explicit initial-cursor and `--from-start`
+- `pctx watch`: local-only JSON-lines changelog tail with explicit initial-cursor and `--from-start`
   semantics.
 
 **Status:** Planned.
@@ -200,9 +200,9 @@ additional import funnels, and a first-class live Obsidian view.
 
 **Deliverables:**
 
-- `people-context brief PERSON [--include-sensitive]`: CLI-only deterministic Markdown/versioned JSON, explicitly
+- `pctx brief PERSON [--include-sensitive]`: CLI-only deterministic Markdown/versioned JSON, explicitly
   distinguishing sensitive context from ordinary-only communication guidance;
-- `people-context export-vcard`: deterministic unchanged-importer round-trip for non-heuristic names, one active
+- `pctx export-vcard`: deterministic unchanged-importer round-trip for non-heuristic names, one active
   affiliation, and one full-date birthday; partial/unparseable birthdays are counted rather than emitted
   non-standardly;
 - Outlook contacts CSV and WhatsApp participant/date imports through the M9 router; WhatsApp bodies never enter
@@ -219,9 +219,9 @@ evidence and narratives.
 
 **Deliverables:**
 
-- `people-context doctor`: report-only deterministic duplicate/contradiction/soft-deleted-reference findings with
+- `pctx doctor`: report-only deterministic duplicate/contradiction/soft-deleted-reference findings with
   structured id-based CLI/MCP suggested actions, never shell-interpolated or auto-applied;
-- `people-context stats`: versioned aggregate-only local inventory including sensitivity/audit/changelog summaries,
+- `pctx stats`: versioned aggregate-only local inventory including sensitivity/audit/changelog summaries,
   disclosure-gate state, path redaction, and main+WAL+SHM storage size;
 - additive transliteration-aware `match_detail` while preserving exact-match reason/ranking/ambiguity;
 - a fictional-data, locally runnable evaluation plus dated results and use-case gallery.
@@ -237,7 +237,7 @@ The following remain candidates, not commitments:
 - multi-user ownership and sharing;
 - authenticated remote transport;
 - reminder notification daemon (M13 ships only a pull-based calendar-feed export);
-- read-only local web viewer (`people-context browse`; M14's Obsidian plugin covers browsing for Obsidian users);
+- read-only local web viewer (`pctx browse`; M14's Obsidian plugin covers browsing for Obsidian users);
 - CardDAV synchronization (M14 ships only one-way vCard export).
 
 See `docs/specs/` for one implementation spec per M8–M15 milestone, and

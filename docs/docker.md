@@ -3,7 +3,7 @@
 Status: Delivered as part of [M8 — Distribution & reach](roadmap.md#m8--distribution--reach).
 
 The container image is an **optional** convenience distribution of the same local stdio MCP server that
-`uvx --from people-context people-context-mcp` runs. It is not the default or recommended install path, and it is
+`uvx --from people-context people-context` runs. It is not the default or recommended install path, and it is
 **not a security sandbox**: the server runs local Python with the container user's filesystem permissions, exactly
 like every other integration.
 
@@ -19,7 +19,7 @@ deployment. See the [README quick start](../README.md#quick-start).
 - The default entrypoint is the **stdio** MCP server. Loopback HTTP stays opt-in through arguments and is never the
   container default.
 - Runtime makes no outbound network request. As everywhere else, only the explicit
-  `people-context reindex --semantic` command may download the pinned model, and the semantic extra is not
+  `pctx reindex --semantic` command may download the pinned model, and the semantic extra is not
   installed in this image.
 
 ## Supported architecture
@@ -76,7 +76,7 @@ resolved database path:
 ```bash
 docker run --rm \
   -v people-context-data:/data \
-  --entrypoint people-context \
+  --entrypoint pctx \
   ghcr.io/jinyangwang27/people-context:latest db-path -v
 ```
 

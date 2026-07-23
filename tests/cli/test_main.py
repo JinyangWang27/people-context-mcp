@@ -1,4 +1,4 @@
-"""Tests for the `people-context` CLI (db-path, list, search, show, export)."""
+"""Tests for the `pctx` CLI (db-path, list, search, show, export)."""
 
 from __future__ import annotations
 

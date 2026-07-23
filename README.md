@@ -87,16 +87,19 @@ The fastest path from discovery to a working stdio server is a zero-clone, zero-
 `people-context` distribution:
 
 ```bash
-uvx --from people-context people-context-mcp
+uvx --from people-context people-context
 ```
 
 For a persistent installation of both the MCP server and the human-operated CLI:
 
 ```bash
 uv tool install people-context
-people-context-mcp
-people-context --help
+people-context
+pctx --help
 ```
+
+`people-context-mcp` remains an equivalent MCP server command for existing client configurations. `pctx` is the
+human-operated CLI.
 
 For local development:
 
@@ -122,7 +125,7 @@ After recording people and relationships through MCP, inspect structure with `ge
 `find_connection`, then create a human-browsable vault:
 
 ```bash
-uv run people-context export-vault --output ~/PeopleVault
+uv run pctx export-vault --output ~/PeopleVault
 ```
 
 The directory is accepted only when nonexistent, empty, or already marked with `.people-context-vault`.
@@ -138,7 +141,7 @@ Clients that support local stdio MCP servers can use:
   "mcpServers": {
     "people-context": {
       "command": "uvx",
-      "args": ["--from", "people-context", "people-context-mcp"]
+      "args": ["--from", "people-context", "people-context"]
     }
   }
 }
@@ -150,7 +153,7 @@ A native-UV [MCPB](https://github.com/modelcontextprotocol/mcpb) bundle installs
 desktop hosts (such as Claude Desktop) with one click; the host's `uv` runtime installs the pinned
 `people-context` release and runs the same stdio server. Build it with `mcpb/build.sh`.
 
-Cursor, Windsurf, and VS Code use the canonical `uvx --from people-context people-context-mcp` invocation with
+Cursor, Windsurf, and VS Code use the canonical `uvx --from people-context people-context` invocation with
 per-editor config files. See [docs/desktop-and-editors.md](docs/desktop-and-editors.md).
 
 ## Docker (optional)
@@ -182,7 +185,7 @@ The base install downloads nothing. Opt in explicitly:
 
 ```bash
 uv sync --extra semantic
-uv run people-context reindex --semantic
+uv run pctx reindex --semantic
 ```
 
 Only that reindex command may download the pinned multilingual model. Server startup/search are cache-only.
@@ -197,26 +200,26 @@ Server and CLI use the first available source:
 4. `OPENCLAW_WORKSPACE` or `~/.openclaw/workspace`;
 5. the XDG data fallback.
 
-Inspect the selected path with `uv run people-context db-path -v`.
+Inspect the selected path with `uv run pctx db-path -v`.
 
 ## CLI overview
 
 ```bash
-uv run people-context db-path [-v]
-uv run people-context list [--all]
-uv run people-context search <query>
-uv run people-context show <person>
-uv run people-context export [--output FILE]
-uv run people-context relationship-types
-uv run people-context relationship-types add TYPE --category C [--inverse T | --symmetric]
-uv run people-context normalize-relationships [--apply]
-uv run people-context export-vault --output DIR [--include-sensitive]
-uv run people-context edit PERSON [--name NAME] [--summary TEXT]
-uv run people-context add-alias PERSON VALUE [--kind KIND]
-uv run people-context set communication_philosophy VALUE
-uv run people-context delete PERSON [--yes]
-uv run people-context sync-log [--limit N] [--entity ID] [--payloads]
-uv run people-context reindex [--semantic]
+uv run pctx db-path [-v]
+uv run pctx list [--all]
+uv run pctx search <query>
+uv run pctx show <person>
+uv run pctx export [--output FILE]
+uv run pctx relationship-types
+uv run pctx relationship-types add TYPE --category C [--inverse T | --symmetric]
+uv run pctx normalize-relationships [--apply]
+uv run pctx export-vault --output DIR [--include-sensitive]
+uv run pctx edit PERSON [--name NAME] [--summary TEXT]
+uv run pctx add-alias PERSON VALUE [--kind KIND]
+uv run pctx set communication_philosophy VALUE
+uv run pctx delete PERSON [--yes]
+uv run pctx sync-log [--limit N] [--entity ID] [--payloads]
+uv run pctx reindex [--semantic]
 ```
 
 See [docs/cli.md](docs/cli.md).

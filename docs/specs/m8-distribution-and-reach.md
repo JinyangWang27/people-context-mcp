@@ -4,8 +4,8 @@ Status: Planned. See [docs/roadmap.md](../roadmap.md#m8--distribution--reach).
 
 ## Motivation
 
-The project already publishes the primary `people-context` PyPI distribution, a compatibility
-`people-context-mcp` shim, a Claude Code plugin, and an OpenClaw package. M8 reduces the distance from discovery
+The project already publishes the primary `people-context` PyPI distribution, a Claude Code plugin, and an
+OpenClaw package. M8 reduces the distance from discovery
 to a working local stdio server: zero-clone execution, Registry/directory metadata, a native-UV Desktop bundle,
 common editor configuration, and an optional container image. All paths retain the existing local-process threat
 model and MCP behavior.
@@ -14,7 +14,7 @@ model and MCP behavior.
 
 In scope:
 
-- verify and lead with `uvx --from people-context people-context-mcp`;
+- verify and lead with `uvx --from people-context people-context`;
 - official MCP Registry metadata and ownership proof;
 - a current submission/metadata matrix for Smithery, PulseMCP, mcp.so, and Glama, including required in-repo files;
 - a native-UV `.mcpb` Desktop extension;
@@ -32,11 +32,12 @@ Non-goals:
 
 ### Zero-clone PyPI path
 
-The primary distribution is `people-context`; `people-context-mcp` is compatibility-only. Verify on a clean
+The primary distribution is `people-context`; `people-context-mcp` is a server-command compatibility alias.
+Verify on a clean
 machine:
 
 ```text
-uvx --from people-context people-context-mcp --help
+uvx --from people-context people-context --help
 ```
 
 and one real stdio remember/resolve/context round trip. Put this path before tool installation and source checkout
@@ -89,7 +90,7 @@ Add Cursor, Windsurf, and VS Code stdio configurations beside the existing clien
 client snippet uses one canonical invocation:
 
 ```text
-uvx --from people-context people-context-mcp
+uvx --from people-context people-context
 ```
 
 MCPB retains its native manifest shape and is not rewritten as that command.

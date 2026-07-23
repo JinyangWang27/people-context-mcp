@@ -23,7 +23,7 @@ from people_context.ports.records import Record, RecordReader, RecordWriter
 from people_context.ports.repository import PersonReader, PersonSearchIndexer, PersonWriter, SearchHit
 from people_context.ports.unit_of_work import UnitOfWork
 
-_WARNING_SUFFIX = "Primary data was saved; run `uv run people-context reindex --semantic` to repair vectors."
+_WARNING_SUFFIX = "Primary data was saved; run `uv run pctx reindex --semantic` to repair vectors."
 
 
 class IndexingPeopleRepository:

@@ -181,7 +181,7 @@ def build_runtime(
     except Exception as exc:  # noqa: BLE001 - optional derived index cannot block primary operations
         warn(
             f"Semantic index maintenance is unavailable: {exc}. "
-            "Run `uv run people-context reindex --semantic`."
+            "Run `uv run pctx reindex --semantic`."
         )
         semantic_updater = None
     if semantic_updater is not None:

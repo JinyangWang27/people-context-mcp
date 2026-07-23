@@ -27,7 +27,7 @@ def register(mcp: FastMCP, deps: RuntimeUseCases) -> None:
         """Export the complete portable domain dataset.
 
         This tool is absent from the normal MCP surface. Prefer the human-operated
-        `people-context export` CLI; enable this tool only for a deliberately
+        `pctx export` CLI; enable this tool only for a deliberately
         elevated MCP server process.
         """
         return deps.export_data.execute().model_dump(mode="json")
