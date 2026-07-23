@@ -27,22 +27,33 @@ Whichever path applies below, **resolve every person the request names first** w
 `resolve_person` (see [Resolve people first](#resolve-people-first)) so an existing
 person is updated, not duplicated.
 
+**Precedence between the paths.** A single request can carry both an identity assertion
+and a structured record — for example `Alice is an engineer at Acme` is both a person
+and an affiliation. When the request contains any fact, affiliation, or interaction the
+staged schema can represent, route that structured content through **path 2 (staging)**
+so it is reviewable and queryable. Never fold it into a `remember_person` `summary`,
+which would bypass review and leave affiliation/fact queries unaware of the record. The
+path-1 summary fast path applies only to a pure identity assertion with no such
+structured content.
+
 ### 1. Explicit person assertion → `remember_person`
 
-When the description is a direct assertion that a specific person exists or should be
-recorded — a name, optionally aliases/nicknames, a one-line summary of who they are,
-and optionally that they are the user (`is_self`) — it fits `remember_person`'s
-contract. Resolve the person first; if a confident match exists, call `remember_person`
-with that person's **canonical name** so the existing record is updated (its lookup
-matches only the exact normalized `name`, not the supplied aliases, so a partial name
-like `Alice` would otherwise create a second record beside `Alice Smith`). Call
-`remember_person` with those fields only. If it returns `ambiguous_person`, the
-canonical name matches several stored people and `remember_person` has **no `person_id`
-parameter**, so re-asking the user to pick the name cannot complete the write — it only
-re-raises the same error. Target the intended person by passing their **unique handle**
-as `name` (its lookup also matches handles), and if they have no unique handle, report
-that this workflow cannot direct-write to one of several identically-named people — the
-same targeting limitation as staging — instead of looping on the error.
+When the description is a pure identity assertion that a specific person exists or
+should be recorded — a name, optionally aliases/nicknames, a one-line summary of who
+they are, and optionally that they are the user (`is_self`) — and it carries no
+structured fact/affiliation/interaction, it fits `remember_person`'s contract.
+Resolve the person first; if a confident match exists, call `remember_person` with their
+**canonical name** so the existing record is updated (its lookup matches only the exact
+normalized `name`, not the supplied aliases, so a partial name like `Alice` would
+otherwise create a second record beside `Alice Smith`). Call `remember_person` with
+those fields only. If it returns `ambiguous_person`, the canonical name matches several
+stored people and `remember_person` has **no `person_id` parameter**, so re-asking the
+user to pick the name cannot complete the write — it only re-raises the same error.
+Target the intended person by passing **any unique alias** as `name`: the lookup matches
+every alias regardless of kind (nickname, handle, former name, …), so any alias that
+resolves to exactly one person works. If no alias resolves uniquely, report that this
+workflow cannot direct-write to one of several identically-named people instead of
+looping on the error.
 
 If it returns `self_already_exists`, do not treat the error as done — the user cannot
 be resolved by a pronoun like "I", so a self assertion such as "I also go by John"
@@ -84,10 +95,15 @@ name alone is ambiguous: prefer putting the resolved person's **unique handle** 
 candidate's `aliases` so the batch binds to exactly them. If the resolved person shares
 a normalized canonical name with another and has no unique handle, staging cannot
 target them unambiguously and the batch would fail to commit — report this limitation
-instead of staging an uncommittable batch. The direct `remember_person` write in path 1
-has the **same limitation** (it has no `person_id` parameter either), so apply the same
-rule there: target by a unique handle, or report that the workflow cannot write to one
-of several identically-named people.
+instead of staging an uncommittable batch. (The staging binder only uses a candidate's
+`handle`-kind aliases — plus its `name` — to match, so for staging the escape hatch is
+specifically a unique **handle**.)
+
+The direct `remember_person` write in path 1 has the **same targeting limitation** — it
+has no `person_id` parameter either — but its escape hatch is broader: its `name` lookup
+matches **any** alias kind, so target the person by passing **any unique alias** (a
+nickname, handle, former name, …) as `name`. Only when no alias resolves uniquely,
+report that the workflow cannot write to one of several identically-named people.
 
 ### 3. Anything that fits neither path → report the limitation, do not force it
 

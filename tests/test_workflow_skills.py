@@ -200,14 +200,26 @@ class TestRememberWorkflow:
 
     def test_direct_write_reports_duplicate_name_limitation(self) -> None:
         # Regression: remember_person has no person_id parameter, so a non-unique
-        # canonical name cannot be targeted by re-picking; the direct write must use a
-        # unique handle or report the limitation, mirroring the staging path.
+        # canonical name cannot be targeted by re-picking. The direct write targets via
+        # ANY unique alias (its lookup matches every alias kind); the staging binder is
+        # limited to a unique handle. Both report the limitation when none resolves.
         lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
 
         assert "person_id" in lowered
         assert "identically-named" in lowered
-        # Both the staging path and the direct write name the unique-handle escape hatch.
-        assert lowered.count("unique handle") >= 2
+        assert "any unique alias" in lowered
+        assert "unique handle" in lowered
+
+    def test_summary_fast_path_excludes_structured_records(self) -> None:
+        # Regression: a request carrying an affiliation/fact/interaction must route the
+        # structured content through staging, not fold it into a remember_person
+        # summary (which would bypass review and hide the structured record).
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "precedence" in lowered
+        assert "pure identity assertion" in lowered
+        assert "bypass review" in lowered
+        assert "engineer at acme" in lowered
 
     def test_resolves_referenced_people_before_staging(self) -> None:
         # Regression: the stager matches only exact normalized names/handles, so a
