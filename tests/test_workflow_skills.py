@@ -200,6 +200,24 @@ class TestRememberWorkflow:
         assert "accept only the dependent" in lowered
         assert "unaccepted" in lowered
 
+    def test_person_candidate_requires_aliases_field(self) -> None:
+        # Regression: PersonCandidateInput.aliases is mandatory (no default), so a
+        # {type, ref, name} row without it is rejected as invalid_candidates.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "aliases: []" in lowered
+        assert "invalid_candidates" in lowered
+
+    def test_person_only_shared_name_update_reported_unsupported(self) -> None:
+        # Regression: a person-only staged update to a shared-canonical-name person has
+        # no dependent row to accept alone, and accepting the person row raises
+        # ambiguous_person, so the case must be reported unsupported.
+        lowered = _skill_path("remember").read_text(encoding="utf-8").lower()
+
+        assert "person-only" in lowered
+        assert "no dependent" in lowered
+        assert "unsupported" in lowered
+
     def test_prior_context_derived_content_always_stages(self) -> None:
         # Regression: the M10 contract keeps prior-context-derived content behind the
         # review gate, so even an extracted identity detail must stage, not direct-write.

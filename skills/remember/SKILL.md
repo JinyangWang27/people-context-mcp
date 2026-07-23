@@ -84,6 +84,10 @@ persists that value as durable provenance on every staged row, so a raw statemen
 there would leak into stored records. Likewise never copy raw conversation, note, or
 transcript text into a candidate field.
 
+**Every `person` candidate needs its mandatory `aliases` field.** `aliases` has no
+default, so a natural `{type, ref, name}` row is rejected with `invalid_candidates`. Set
+`aliases: []` when the person has none, and otherwise list the resolved aliases/handles.
+
 **Interactions need a real occurrence date.** Each `interaction` candidate's `date` is
 mandatory — there is no default. If the request does not say when it happened (for
 example `Alice spoke with Bob`, with no time), ask the user for the date, or report that
@@ -128,6 +132,13 @@ existing person from `matched_person_id` without re-minting the person, so the d
 commits cleanly. Only when the person has no unique handle to bind `matched_person_id` is
 staging a dependent for one of several identically-named people unsupported — report that
 instead.
+
+That dependent-only path needs a dependent record. A **person-only** staged update to a
+shared-canonical-name person — for instance a pure prior-context identity detail like a
+new nickname for one of two people named `Sam`, with no accompanying fact, affiliation,
+or interaction — has no dependent row to accept, and accepting the person row itself
+raises `ambiguous_person`. That case cannot be committed through staging at all; report
+it unsupported rather than offering it as a usable pending proposal.
 
 The direct `remember_person` write in path 1 is different: it does not go through that
 commit path, and its `name` lookup matches **any** alias kind, so a non-unique canonical
