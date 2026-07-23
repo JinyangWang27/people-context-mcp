@@ -22,9 +22,14 @@ The user asked about: **$ARGUMENTS**
    Parse any distinguishing context out of the query into `resolve_person`'s `hints`
    rather than leaving it all in `query` — the name index holds names and aliases, not
    organizations, so `who Alex at Acme` resolves best as `query: "Alex"` with
-   `hints: {"org": "Acme"}`. `hints` accepts `org`, `role`, and `relationship`, which
-   re-rank same-named candidates. When you invite the user to add distinguishing detail
-   after an ambiguous result, feed their answer back through these hints.
+   `hints: {"org": "Acme"}`. `hints` accepts `org`, `role`, and `relationship` and can
+   improve ranking. But hints do **not** reliably break a tie between two equally matched
+   same-name people: exact-name matches stay tied at score `1.0`, and a single hint
+   dimension's boost is smaller than the ambiguity gap, so the result can remain
+   `ambiguous` (documented resolver behaviour). Do not loop on hints expecting them to
+   resolve such a tie — a **unique alias** is the definitive selector, and when the
+   result is still `ambiguous`, surface the candidates for the user to choose rather than
+   guessing.
 
 2. **Branch on the resolver's own `ambiguous` flag — not on candidate count.**
    `resolve_person` returns ranked `candidates` and an `ambiguous` boolean. The flag,

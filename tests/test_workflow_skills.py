@@ -126,6 +126,16 @@ class TestWhoWorkflow:
         assert "candidates[0]" in lowered
         assert "never silently pick" in lowered or "do not guess" in lowered or "never guess" in lowered
 
+    def test_hints_not_relied_on_to_break_same_name_ties(self) -> None:
+        # Regression: exact-name matches stay tied at 1.0 and a single hint's boost is
+        # below the ambiguity gap, so hints cannot resolve a same-name tie; prefer a
+        # unique alias and keep surfacing candidates when still ambiguous.
+        lowered = _skill_path("who").read_text(encoding="utf-8").lower()
+
+        assert "reliably break a tie" in lowered
+        assert "do not loop on hints" in lowered
+        assert "unique alias" in lowered
+
     def test_ambiguous_and_empty_perform_no_second_read(self) -> None:
         lowered = _skill_path("who").read_text(encoding="utf-8").lower()
 
