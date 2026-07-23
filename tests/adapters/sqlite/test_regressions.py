@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import stat
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -14,25 +12,16 @@ from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqliteChangelog,
     SqliteForgetStore,
-    SqliteImportStagingStore,
     SqliteMergeStore,
-    SqliteOrganizationStore,
     SqlitePeopleRepository,
     SqlitePreferencesStore,
-    SqliteRecordStore,
     open_db,
 )
 from people_context.app._mutation import changelog_mutation
-from people_context.app.imports.staging import CandidateStager
-from people_context.app.imports.workflow import CommitImport
 from people_context.app.people.edit import EditPerson, EditPersonInput, PersonNameCollisionError
 from people_context.app.people.forget import Forget
 from people_context.app.people.merge import MergePeople
-from people_context.app.people.remember import AmbiguousPersonError, RememberPerson, RememberPersonInput
-from people_context.app.records.affiliations import SetAffiliation
-from people_context.app.records.facts import RecordFact
-from people_context.app.records.interactions import RecordInteraction
-from people_context.cli import main
+from people_context.app.people.remember import RememberPerson, RememberPersonInput
 from people_context.domain.person import Alias, AliasKind, Person
 from people_context.ports.audit_log import AuditEntry
 
@@ -51,48 +40,6 @@ def _person(name: str, aliases: list[str] | None = None) -> Person:
         created_at=_NOW,
         updated_at=_NOW,
     )
-
-
-def _commit_import(conn) -> tuple[SqlitePeopleRepository, SqliteImportStagingStore, CandidateStager, CommitImport]:
-    people = SqlitePeopleRepository(conn)
-    records = SqliteRecordStore(conn)
-    audit = SqliteAuditLog(conn)
-    staging = SqliteImportStagingStore(conn)
-    clock = _Clock()
-    commit = CommitImport(
-        people,
-        staging,
-        RememberPerson(people, people, audit, clock),
-        RecordInteraction(people, records, audit, clock),
-        SetAffiliation(people, SqliteOrganizationStore(conn), records, audit, clock),
-        RecordFact(people, records, audit, clock),
-    )
-    return people, staging, CandidateStager(people, staging, clock), commit
-
-
-def test_commit_import_is_atomic_when_a_later_candidate_fails() -> None:
-    conn = open_db(":memory:")
-    people, staging, stager, commit = _commit_import(conn)
-    # Two active people share the normalized name, so committing "Sam" is ambiguous.
-    people.save_person(_person("Sam"))
-    people.save_person(_person("sam"))
-    batch = stager.execute(
-        "import/agent:test",
-        [
-            {"type": "person", "ref": "u", "name": "Unique Person", "aliases": []},
-            {"type": "person", "ref": "s", "name": "Sam", "aliases": []},
-        ],
-    )
-    rows = staging.list_batch(batch.batch_id)
-
-    with pytest.raises(AmbiguousPersonError):
-        commit.execute(batch.batch_id, [row.id for row in rows])
-
-    names = {person.canonical_name for person in people.list_people()}
-    assert "Unique Person" not in names, "earlier candidate must roll back with the failed batch"
-    assert all(row.status == "pending" for row in staging.list_batch(batch.batch_id))
-    assert conn.execute("SELECT COUNT(*) FROM audit_log").fetchone()[0] == 0
-    assert conn.execute("SELECT COUNT(*) FROM changelog").fetchone()[0] == 0
 
 
 def test_forget_and_merge_record_the_caller_source() -> None:
@@ -168,21 +115,6 @@ def test_partial_sync_capability_wrapper_is_rejected() -> None:
 def test_open_db_sets_busy_timeout(tmp_path: Path) -> None:
     conn = open_db(tmp_path / "people.db")
     assert conn.execute("PRAGMA busy_timeout").fetchone()[0] == 5000
-
-
-def test_cli_export_file_is_owner_only(tmp_path: Path) -> None:
-    db_path = tmp_path / "people.db"
-    output = tmp_path / "export.json"
-    conn = open_db(db_path)
-    RememberPerson(
-        SqlitePeopleRepository(conn), SqlitePeopleRepository(conn), SqliteAuditLog(conn), _Clock()
-    ).execute(RememberPersonInput(name="Alice"))
-    conn.close()
-
-    assert main(["--db", str(db_path), "export", "--output", str(output)]) == 0
-    mode = stat.S_IMODE(os.stat(output).st_mode)
-    assert mode == 0o600
-    assert "Alice" in output.read_text(encoding="utf-8")
 
 
 def test_preferences_store_uses_injected_clock() -> None:

@@ -6,9 +6,9 @@ from pathlib import Path
 from typing import Any
 
 import anyio
+
 from mcp.client.session import ClientSession
 from mcp.shared.memory import create_connected_server_and_client_session
-
 from people_context.adapters.mcp.server import build_server
 
 

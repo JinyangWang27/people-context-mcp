@@ -7,9 +7,9 @@ from typing import Any
 
 import anyio
 import pytest
+
 from mcp.client.session import ClientSession
 from mcp.shared.memory import create_connected_server_and_client_session
-
 from people_context.adapters import runtime as runtime_module
 from people_context.adapters.mcp.server import build_server
 from people_context.adapters.model2vec_embeddings import MODEL_ID
@@ -450,7 +450,7 @@ def test_merge_people_tool_is_real_and_returns_structured_errors(tmp_path: Path)
     assert merged["self_loops_removed"] == 0
 
 
-def test_m2_write_read_curation_and_guidance_flow(tmp_path: Path, monkeypatch: Any) -> None:
+def test_record_write_read_curation_and_guidance_flow(tmp_path: Path, monkeypatch: Any) -> None:
     monkeypatch.setenv("PEOPLE_CONTEXT_MCP_ENABLE_SENSITIVE", "1")
     db_path = tmp_path / "m2.db"
     server = build_server(db_path=db_path)

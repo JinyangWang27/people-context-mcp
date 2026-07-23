@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from people_context.adapters.filesystem import MARKER_FILE, FileSystemVaultWriter
+from people_context.adapters.filesystem.vault_writer import sanitize_filename
 from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqlitePeopleRepository,
@@ -198,3 +199,46 @@ def test_filename_sanitization_preserves_cjk_and_suffixes_collisions(tmp_path: P
     assert "A_B (01BBBB).md" in names
     assert "A_B (01CCCC).md" in names
     assert "hidden.md" in names
+
+
+def test_sanitize_filename_guards_windows_reserved_and_wikilink_characters() -> None:
+    assert sanitize_filename("CON") == "CON_"
+    assert sanitize_filename("com1") == "com1_"
+    assert sanitize_filename("Nula") == "Nula"
+    assert sanitize_filename("NUL.txt") == "NUL_.txt"
+    assert sanitize_filename("COM1.notes") == "COM1_.notes"
+    assert sanitize_filename("COM¹") == "COM¹_"
+    assert sanitize_filename("Dr. Smith") == "Dr. Smith"
+    assert sanitize_filename("x]]y|z") == "x__y_z"
+    assert sanitize_filename("tag#and^caret") == "tag_and_caret"
+    assert sanitize_filename("王小明") == "王小明"
+
+
+def test_marked_vault_regeneration_preserves_obsidian_and_user_paths(tmp_path: Path) -> None:
+    output = tmp_path / "vault"
+    writer = FileSystemVaultWriter()
+    initial = VaultSnapshot(people=[VaultPerson(id="01AAAA00000000000000000000", name="Alice")])
+    writer.write_vault(output, initial)
+    generated_before = {
+        path.relative_to(output).as_posix(): path.read_bytes() for path in output.rglob("*") if path.is_file()
+    }
+    obsidian = output / ".obsidian" / "workspace.json"
+    obsidian.parent.mkdir()
+    obsidian.write_text('{"layout":"user-owned"}\n', encoding="utf-8")
+    user_note = output / "Notes" / "my-note.md"
+    user_note.parent.mkdir()
+    user_note.write_text("# Keep me\n", encoding="utf-8")
+    scratch = output / "scratch.md"
+    scratch.write_text("user root note\n", encoding="utf-8")
+    stale_generated = output / "People" / "stale.md"
+    stale_generated.write_text("stale\n", encoding="utf-8")
+
+    writer.write_vault(output, initial)
+
+    for relative, content in generated_before.items():
+        assert (output / relative).read_bytes() == content
+    assert (output / MARKER_FILE).is_file()
+    assert obsidian.read_text(encoding="utf-8") == '{"layout":"user-owned"}\n'
+    assert user_note.read_text(encoding="utf-8") == "# Keep me\n"
+    assert scratch.read_text(encoding="utf-8") == "user root note\n"
+    assert not stale_generated.exists()

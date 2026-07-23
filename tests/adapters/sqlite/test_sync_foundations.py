@@ -32,7 +32,7 @@ def test_fresh_database_creates_sync_schema_and_one_stable_device(tmp_path: Path
         reopened.close()
 
 
-def test_m4_database_upgrades_without_inventing_changelog_history(tmp_path: Path) -> None:
+def test_legacy_database_upgrades_without_inventing_changelog_history(tmp_path: Path) -> None:
     db_path = tmp_path / "upgrade.db"
     conn = sqlite3.connect(db_path)
     migration = resources.files("people_context.adapters.sqlite.migrations").joinpath("001_initial.sql")

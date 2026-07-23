@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 import anyio
+
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-
 from people_context.adapters.sqlite import SqliteAuditLog, SqliteContextReader, open_db
 
 

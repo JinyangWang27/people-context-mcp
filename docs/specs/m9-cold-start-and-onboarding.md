@@ -65,7 +65,7 @@ Acceptance builds/installs the wheel in a clean environment and runs `people-con
 
 ### Import router relocation
 
-Move dispatch to `adapters/import_router.py` and make accepted values explicit:
+Move dispatch to `adapters/importers/router.py` and make accepted values explicit:
 
 - `email` and `mbox` → `EmailImportExtractor`;
 - `vcard` → `VCardImportExtractor`;

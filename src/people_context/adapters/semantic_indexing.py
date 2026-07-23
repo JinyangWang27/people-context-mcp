@@ -168,7 +168,7 @@ class IndexingMergeStore:
 
     @property
     def audit_log(self):
-        """Forward the lifecycle adapter's paired mutation journal."""
+        """Forward the merge adapter's paired mutation journal."""
         return self._delegate.audit_log
 
     def _best_effort(self, operation: Callable[[], None]) -> None:
@@ -178,7 +178,7 @@ class IndexingMergeStore:
             self._warn(f"Semantic index refresh failed: {exc}. {_WARNING_SUFFIX}")
 
 
-class _ForgetLifecycleStore(ForgetStore, ForgetPreviewStore, Protocol):
+class _ForgetOperations(ForgetStore, ForgetPreviewStore, Protocol):
     """Combined adapter shape used only by the semantic decorator."""
 
 
@@ -187,7 +187,7 @@ class IndexingForgetStore:
 
     def __init__(
         self,
-        delegate: _ForgetLifecycleStore,
+        delegate: _ForgetOperations,
         updater: SemanticIndexUpdater,
         warn: Callable[[str], None],
     ) -> None:

@@ -1,12 +1,10 @@
-"""Regression tests for the execution-verified M7 review findings."""
+"""SQLite relationship regression tests."""
 
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from pathlib import Path
 from time import perf_counter
 
-from people_context.adapters.filesystem import MARKER_FILE, FileSystemVaultWriter
 from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqliteChangelog,
@@ -25,7 +23,6 @@ from people_context.app.relationships import (
     SetRelationshipInput,
 )
 from people_context.domain.person import Person
-from people_context.domain.vault import VaultPerson, VaultSnapshot
 
 
 class FakeClock:
@@ -152,36 +149,6 @@ def test_reassertion_keeps_omitted_fields_updates_provenance_and_changed_fields(
     }
     assert latest.payload["label"] == "college friend"
     assert latest.payload["period"] == {"valid_from": "2020-01-01", "valid_to": "2030-12-31"}
-
-
-def test_marked_vault_regeneration_preserves_obsidian_and_user_paths(tmp_path: Path) -> None:
-    output = tmp_path / "vault"
-    writer = FileSystemVaultWriter()
-    initial = VaultSnapshot(people=[VaultPerson(id="01AAAA00000000000000000000", name="Alice")])
-    writer.write_vault(output, initial)
-    generated_before = {
-        path.relative_to(output).as_posix(): path.read_bytes() for path in output.rglob("*") if path.is_file()
-    }
-    obsidian = output / ".obsidian" / "workspace.json"
-    obsidian.parent.mkdir()
-    obsidian.write_text('{"layout":"user-owned"}\n', encoding="utf-8")
-    user_note = output / "Notes" / "my-note.md"
-    user_note.parent.mkdir()
-    user_note.write_text("# Keep me\n", encoding="utf-8")
-    scratch = output / "scratch.md"
-    scratch.write_text("user root note\n", encoding="utf-8")
-    stale_generated = output / "People" / "stale.md"
-    stale_generated.write_text("stale\n", encoding="utf-8")
-
-    writer.write_vault(output, initial)
-
-    for relative, content in generated_before.items():
-        assert (output / relative).read_bytes() == content
-    assert (output / MARKER_FILE).is_file()
-    assert obsidian.read_text(encoding="utf-8") == '{"layout":"user-owned"}\n'
-    assert user_note.read_text(encoding="utf-8") == "# Keep me\n"
-    assert scratch.read_text(encoding="utf-8") == "user root note\n"
-    assert not stale_generated.exists()
 
 
 def test_dense_graph_uses_fast_bfs_and_type_filters_resolve_vocabulary() -> None:

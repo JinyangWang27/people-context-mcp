@@ -136,7 +136,7 @@ From the repository root:
 ```bash
 claude plugin validate . --strict
 uv run people-context-mcp --help
-uv run pytest -q tests/adapters/test_mcp_server.py tests/adapters/test_email_import.py
+uv run pytest -q tests/adapters/mcp/test_server.py tests/adapters/importers/test_email.py
 ```
 
 For an end-to-end local installation test:

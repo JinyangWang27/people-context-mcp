@@ -18,8 +18,9 @@ See also: [docs/data-model.md](data-model.md) for what the core actually stores,
                          │  adapters/sqlite/     adapters/mcp/          │
                          │    db.py                server.py            │
                          │    migrations/*.sql     tools/*.py           │
-                         │    repository.py       unit_of_work.py     │
-                         │    audit_log.py       changelog.py  hlc.py   │
+                         │    repository.py         merge_store.py      │
+                         │    forget_store.py       record_store.py     │
+                         │    audit_log.py          unit_of_work.py     │
                          │    semantic.py        importers/*.py         │
                          │                                              │
                          │  cli/*.py              runtime.py config.py  │
@@ -77,8 +78,9 @@ resolution, or the minimal-disclosure cap in context assembly) is allowed to liv
 `typing.Protocol` interfaces, split narrowly by concern rather than one fat repository interface:
 `PersonReader` and `PersonWriter` (`ports/repository.py`), semantic embedding/vector/rebuild ports
 (`ports/semantic.py`), `AuditLog` (`ports/audit_log.py`), `Changelog` (`ports/changelog.py`),
-`HybridLogicalClock` (`ports/hlc.py`), `UnitOfWork` (`ports/unit_of_work.py`), and `Clock`
-(`ports/clock.py`). Splitting concerns means read use cases do not depend on write, audit, or sync capability.
+`MergeStore` (`ports/merge.py`), `ForgetStore` and `ForgetPreviewStore` (`ports/forget.py`),
+`HybridLogicalClock` (`ports/hlc.py`), `UnitOfWork` (`ports/unit_of_work.py`), and `Clock` (`ports/clock.py`).
+Splitting concerns means read, merge, forget, audit, and sync use cases depend only on capabilities they consume.
 The application layer owns transaction orchestration through the UoW port; SQLite owns BEGIN/COMMIT/ROLLBACK.
 
 ### `adapters`
@@ -86,8 +88,9 @@ The application layer owns transaction orchestration through the UoW port; SQLit
 Concrete implementations of the ports, plus anything that talks to the outside world:
 
 - `adapters/sqlite/` — `db.py` (connection, migrations, and local device initialization), migrations
-  `001_initial.sql` and `002_sync_foundations.sql`, repositories, `audit_log.py`, `changelog.py`, `hlc.py`, and
-  `unit_of_work.py`. Adapter write methods join an enclosing transaction rather than committing independently.
+  `001_initial.sql` and `002_sync_foundations.sql`, repositories, focused merge/forget, organization, preference,
+  record, audit, changelog, HLC, and unit-of-work adapters. `record_store.py` persists only assertive records and
+  reminders. Adapter write methods join an enclosing transaction rather than committing independently.
 - `adapters/mcp/` — `server.py` (`build_server`/`main`, tool registration and annotations), `tools/` (one
   module per tool group).
 - `adapters/importers/` — source-specific, stdlib-backed email, ICS, LinkedIn, and vCard extraction plus

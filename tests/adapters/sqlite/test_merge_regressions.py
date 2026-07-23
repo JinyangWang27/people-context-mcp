@@ -1,4 +1,4 @@
-"""Regression coverage for the post-M7 follow-up fixes (migration 004, merge dedupe, vault names)."""
+"""SQLite migration and merge regression tests."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ from datetime import UTC, date, datetime
 from importlib import resources
 from pathlib import Path
 
-from people_context.adapters.filesystem.vault_writer import sanitize_filename
 from people_context.adapters.sqlite import (
     SqliteAuditLog,
     SqliteChangelog,
@@ -122,19 +121,6 @@ def test_merge_dedupes_overlapping_parallel_edges_and_keeps_history() -> None:
         if entry.op_kind == "delete" and entry.payload.get("merged_into")
     ]
     assert len(delete_ops) == 1, "deduped edge must be captured in the changelog"
-
-
-def test_sanitize_filename_guards_windows_reserved_and_wikilink_characters() -> None:
-    assert sanitize_filename("CON") == "CON_"
-    assert sanitize_filename("com1") == "com1_"
-    assert sanitize_filename("Nula") == "Nula"
-    assert sanitize_filename("NUL.txt") == "NUL_.txt"
-    assert sanitize_filename("COM1.notes") == "COM1_.notes"
-    assert sanitize_filename("COM¹") == "COM¹_"
-    assert sanitize_filename("Dr. Smith") == "Dr. Smith"
-    assert sanitize_filename("x]]y|z") == "x__y_z"
-    assert sanitize_filename("tag#and^caret") == "tag_and_caret"
-    assert sanitize_filename("王小明") == "王小明"
 
 
 def test_merge_never_dedupes_preexisting_primary_edges() -> None:
