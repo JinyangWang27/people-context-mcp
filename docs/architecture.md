@@ -20,10 +20,9 @@ See also: [docs/data-model.md](data-model.md) for what the core actually stores,
                          │    migrations/*.sql     tools/*.py           │
                          │    repository.py       unit_of_work.py     │
                          │    audit_log.py       changelog.py  hlc.py   │
-                         │    semantic.py        email_import.py        │
-                         │                       vcard_import.py        │
+                         │    semantic.py        importers/*.py         │
                          │                                              │
-                         │  cli.py                config.py             │
+                         │  cli/*.py              runtime.py config.py  │
                          └───────────────────┬─────────────────────────┘
                                              │ implements
                          ┌───────────────────▼─────────────────────────┐
@@ -40,9 +39,9 @@ See also: [docs/data-model.md](data-model.md) for what the core actually stores,
                                              │ depended on by (never implemented in)
                          ┌───────────────────▼─────────────────────────┐
                          │                   app                        │
-                         │  resolve_person.py   person_context.py       │
-                         │  record.py           communication.py        │
-                         │  importing.py        curate.py   export.py   │
+                         │  people/      context/       records/         │
+                         │  relationships/ imports/     exports/         │
+                         │  semantic/      _mutation.py                  │
                          └───────────────────┬─────────────────────────┘
                                              │ operates on
                          ┌───────────────────▼─────────────────────────┐
@@ -61,16 +60,17 @@ See also: [docs/data-model.md](data-model.md) for what the core actually stores,
 Pure data and small, dependency-free behaviour: `Person`, `Alias`, `Relationship`, `Organization`,
 `Affiliation`, `Fact`, `Observation`, `Trait`, `Interaction`, `Reminder`, and the shared value objects
 (`Confidence`, `Sensitivity`, `Provenance`, `ValidityPeriod`, ULID id generation, name normalization). These
-are Pydantic models with no knowledge of persistence, transport, or process boundaries. One entity per
-module (SRP).
+are Pydantic models with no knowledge of persistence, transport, or process boundaries. Modules group only
+cohesive domain concepts.
 
 ### `app`
 
-Use cases: one class per module, each depending only on `ports` (never on a concrete adapter). Examples:
-`ResolvePerson`, `SearchPeople`, `RememberPerson`, `SemanticSearch`, `CandidateStager`, and the lifecycle,
-guidance, import, curation, and export use cases. Use cases orchestrate domain
-objects and ports; they contain the only place application-level policy (e.g. the ambiguity threshold in
-identity resolution, or the minimal-disclosure cap in context assembly) is allowed to live.
+Use cases are organized by product capability: `people`, `context`, `records`, `relationships`, `imports`,
+`exports`, and `semantic`. Small symmetric use cases may share a focused module; workflows with distinct
+models, staging, and orchestration responsibilities are split. Classes still remain focused and depend only
+on `domain` and narrow `ports`, never on a concrete adapter. The root `app` package is not a public barrel.
+Use cases contain the only place application-level policy (e.g. the ambiguity threshold in identity
+resolution, or the minimal-disclosure cap in context assembly) is allowed to live.
 
 ### `ports`
 
@@ -90,11 +90,14 @@ Concrete implementations of the ports, plus anything that talks to the outside w
   `unit_of_work.py`. Adapter write methods join an enclosing transaction rather than committing independently.
 - `adapters/mcp/` — `server.py` (`build_server`/`main`, tool registration and annotations), `tools/` (one
   module per tool group).
-- `adapters/email_import.py` and `adapters/vcard_import.py` — source-specific, stdlib-backed extraction;
-  both feed the shared candidate staging use case described in [docs/import.md](import.md).
+- `adapters/importers/` — source-specific, stdlib-backed email, ICS, LinkedIn, and vCard extraction plus
+  routing; every importer feeds the shared candidate staging use case described in [docs/import.md](import.md).
 - `adapters/model2vec_embeddings.py`, `adapters/semantic_indexing.py`, and `adapters/sqlite/semantic.py` —
   optional cached embeddings, best-effort lifecycle refresh decorators, and same-file cosine vec0 storage.
-- `cli.py` — the `people-context` CLI, built on the same `app` use cases as the MCP tools.
+- `cli/` — parser/dispatch and capability command modules for the `people-context` CLI, built on the same
+  application runtime as the MCP tools while preserving `people_context.cli:main`.
+- `adapters/runtime.py` — the shared composition root for SQLite, optional semantic decorators, clocks, and
+  application use cases. Process entrypoints inject their own warning sink.
 - `config.py` — DB path resolution (flag → env → config file → agent workspace → XDG); this is itself an
   adapter concern (it reads environment and filesystem) but is small enough to live at the package root.
 
@@ -103,13 +106,15 @@ Concrete implementations of the ports, plus anything that talks to the outside w
 Dependencies point inward only:
 
 ```
-adapters  →  ports  →  app  →  domain
+adapters/process  →  app  →  ports
+                     │       │
+                     └───────┴──→ domain
 ```
 
-`domain` and `app` do not import anything from `adapters`, and do not import the `mcp` package or `sqlite3`.
-This is enforced by convention and code review today; a lint rule (e.g. `ruff`'s `TID251`/banned-imports, or
-an import-linter contract) may be added later to enforce it mechanically. Any module under `domain/` or
-`app/` that needs to import `sqlite3`, `mcp`, or anything under `adapters/` is a layering bug.
+`domain` has no outward project-layer dependencies, `ports` depends only on `domain`, and `app` depends only
+on `domain` and `ports` (plus modules within its own capability packages). A standard-library AST test
+enforces these rules and rejects internal runtime import cycles. Any concrete adapter, MCP, SQLite, CLI, or
+other process dependency entering the core is a layering bug.
 
 ## How new transports and importers slot in
 
@@ -132,10 +137,11 @@ Because `app` only depends on `ports`, adding a new way to reach the core is pur
 Wiring — constructing concrete adapters and injecting them into use cases — happens only at entrypoints,
 never inside `domain` or `app`:
 
-- `adapters/mcp/server.py:build_server()` resolves the DB path, opens the SQLite connection, constructs
-  `SqlitePeopleRepository`, `SqliteAuditLog` (paired with the local changelog/HLC), and `SystemClock`, builds
-  the `app` use cases from them, and
-  registers MCP tools that call into those use cases. `main()` parses `--db` plus transport flags; it runs
+- `adapters/runtime.py:build_runtime()` resolves the DB path, opens the SQLite connection, constructs the
+  concrete stores and `SystemClock`, applies optional semantic decorators, and builds the application use
+  cases once. CLI and MCP inject different warning callbacks without duplicating setup.
+- `adapters/mcp/server.py:build_server()` obtains the shared runtime and registers MCP tools that call its use
+  cases. `main()` parses `--db` plus transport flags; it runs
   stdio by default or applies loopback HTTP settings before `run(transport="streamable-http")`.
 
   The server shares one SQLite connection (`check_same_thread=True`) across all tools, which is safe because
@@ -143,8 +149,8 @@ never inside `domain` or `app`:
   for now: a long tool call blocks the whole server, and upgrading to an SDK that dispatches sync tools to
   worker threads would require moving to a connection-per-request (or serialized-access) design first. Revisit
   this deliberately when bumping the `mcp` dependency — do not just flip `check_same_thread`.
-- `cli.py:main()` performs the equivalent wiring for the CLI, so CLI commands and MCP tools call the exact
-  same use case classes and therefore obey the exact same audit/provenance rules.
+- `cli/main.py:main()` performs parser dispatch against the same runtime, so CLI commands and MCP tools call
+  the exact same use case classes and therefore obey the exact same audit/provenance rules.
 - `__main__.py` (`python -m people_context`) is a thin alias to the stdio server entrypoint.
 
 This is Dependency Inversion in practice: `app` and `domain` depend only on abstractions (`ports`); concrete
@@ -154,7 +160,7 @@ choices are made once, at the edge, in the entrypoint that happens to be running
 
 | Principle | How it is applied here |
 |---|---|
-| **S**ingle Responsibility | One use case per `app/` module; one entity per `domain/` module. |
+| **S**ingle Responsibility | Cohesive capability modules contain focused classes; file count is not a proxy for responsibility. |
 | **O**pen/Closed | New adapters add tools, importers, and transports without changing core policy. |
 | **L**iskov Substitution | SQLite and in-memory implementations substitute behind the same ports. |
 | **I**nterface Segregation | Reader, writer, audit, and clock ports stay narrow. |
